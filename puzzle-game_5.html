@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Terminal Rooms — Puzzle Prototype</title>
+<style>
+  :root{
+    --crt-bg:#0a0f0a;
+    --crt-fg:#7dffb0;
+    --crt-dim:#2f6b47;
+    --amber:#ffcf6b;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; height:100%; overflow:hidden; background:#000; font-family:"Courier New",monospace; }
+  #app{ position:fixed; inset:0; }
+
+  /* Low internal-res canvas scaled up = chunky N64 pixels */
+  #scene{
+    display:block; width:100%; height:100%;
+    image-rendering:pixelated;
+    image-rendering:crisp-edges;
+    cursor:none;
+  }
+
+  /* ---------- World HUD ---------- */
+  #hud{ position:absolute; inset:0; pointer-events:none; }
+  #crosshair{
+    position:absolute; left:50%; top:50%; width:6px; height:6px; margin:-3px 0 0 -3px;
+    background:#eafff2; border-radius:50%; box-shadow:0 0 0 1px rgba(0,0,0,.6); opacity:0; transition:opacity .1s;
+  }
+  #prompt{
+    position:absolute; left:50%; bottom:14%; transform:translateX(-50%);
+    color:#eafff2; font-size:15px; letter-spacing:1px; padding:8px 14px;
+    background:rgba(6,14,10,.72); border:1px solid var(--crt-dim); border-radius:4px;
+    text-shadow:0 1px 2px #000; opacity:0; transition:opacity .12s;
+  }
+  #prompt b{ color:var(--amber); }
+  #objectives{
+    position:absolute; left:14px; top:12px; color:#cfeede; font-size:12px; line-height:1.6;
+    background:rgba(6,14,10,.55); border:1px solid rgba(60,120,90,.5); border-radius:4px; padding:8px 12px;
+  }
+  #objectives h4{ margin:0 0 4px; color:var(--amber); font-size:11px; letter-spacing:2px; font-weight:700; }
+  #objectives .o{ opacity:.85; }
+  #objectives .o.done{ color:#7dffb0; text-decoration:line-through; opacity:1; }
+
+  /* ---------- Click-to-play overlay ---------- */
+  #start{
+    position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    text-align:center; color:#cfeede; background:radial-gradient(circle at 50% 40%, rgba(10,25,18,.4), rgba(0,0,0,.82));
+    cursor:pointer; z-index:5;
+  }
+  #start h1{ font-size:28px; letter-spacing:4px; margin:0 0 6px; color:#eafff2; }
+  #start p{ margin:4px; font-size:13px; letter-spacing:1px; color:#8fbfa5; }
+  #start .keys{ margin-top:16px; font-size:12px; color:#6f9c85; line-height:1.9; }
+  #start .keys span{ color:var(--amber); }
+
+  /* ---------- Computer / CRT screen ---------- */
+  #computer{
+    position:absolute; inset:0; z-index:10; display:none;
+    align-items:center; justify-content:center;
+    background:radial-gradient(circle at 50% 45%, #10130f 0%, #000 75%);
+  }
+  #computer.on{ display:flex; }
+  .bezel{
+    width:min(760px,94vw); height:min(660px,94vh);
+    background:linear-gradient(#22271f,#14170f);
+    border:14px solid #0c0e0a; border-radius:18px;
+    box-shadow:0 0 0 3px #2c322a, inset 0 0 40px rgba(0,0,0,.9), 0 20px 60px rgba(0,0,0,.7);
+    padding:14px; display:flex; flex-direction:column;
+  }
+  .screen{
+    position:relative; flex:1; background:var(--crt-bg); border-radius:10px; overflow:hidden;
+    color:var(--crt-fg); display:flex; flex-direction:column;
+    box-shadow:inset 0 0 60px rgba(0,50,20,.35), inset 0 0 6px rgba(120,255,170,.25);
+  }
+  /* scanlines + curvature vignette */
+  .screen::after{
+    content:""; position:absolute; inset:0; pointer-events:none;
+    background:repeating-linear-gradient(rgba(0,0,0,0) 0 2px, rgba(0,0,0,.18) 2px 3px);
+    mix-blend-mode:multiply;
+  }
+  .screen::before{
+    content:""; position:absolute; inset:0; pointer-events:none; z-index:2;
+    box-shadow:inset 0 0 90px rgba(0,0,0,.7);
+  }
+  .topbar{
+    display:flex; align-items:center; gap:8px; padding:10px 12px; border-bottom:1px solid var(--crt-dim);
+    font-size:12px; letter-spacing:2px; color:var(--amber); text-shadow:0 0 6px rgba(255,207,107,.4);
+  }
+  .topbar .title{ flex:1; font-weight:700; }
+  .tab{
+    background:transparent; color:var(--crt-fg); border:1px solid var(--crt-dim);
+    font-family:inherit; font-size:11px; letter-spacing:1px; padding:4px 9px; border-radius:3px; cursor:pointer;
+  }
+  .tab.active{ background:var(--crt-dim); color:#eafff2; }
+  .tab:hover{ border-color:var(--crt-fg); }
+  .exit{ border-color:#8a3a3a; color:#ffb0b0; }
+  .exit:hover{ background:#5a1e1e; }
+  .stage{ position:relative; z-index:1; flex:1; overflow:auto; padding:16px; }
+  .banner{
+    text-align:center; font-size:15px; letter-spacing:2px; margin:2px 0 14px; min-height:20px;
+    color:var(--amber); text-shadow:0 0 8px rgba(255,207,107,.35);
+  }
+  .banner.win{ color:#7dffb0; text-shadow:0 0 10px rgba(125,255,176,.5); }
+
+  /* ---------- Wordle ---------- */
+  .wgrid{ display:grid; grid-template-rows:repeat(6,1fr); gap:6px; width:288px; margin:0 auto; }
+  .wrow{ display:grid; grid-template-columns:repeat(5,1fr); gap:6px; }
+  .wcell{
+    aspect-ratio:1; display:flex; align-items:center; justify-content:center;
+    font-size:26px; font-weight:700; color:#eafff2; border:2px solid #33513f; border-radius:3px;
+    text-transform:uppercase; background:#0e150f;
+  }
+  .wcell.filled{ border-color:#5f8a70; }
+  .wcell.correct{ background:#3f8f57; border-color:#3f8f57; color:#04120a; }
+  .wcell.present{ background:#c1a63f; border-color:#c1a63f; color:#12100a; }
+  .wcell.absent{ background:#2a2f2a; border-color:#2a2f2a; color:#8fa596; }
+  .kbd{ margin:16px auto 0; width:min(420px,100%); }
+  .krow{ display:flex; justify-content:center; gap:5px; margin-bottom:5px; }
+  .key{
+    min-width:26px; padding:9px 6px; font-family:inherit; font-size:12px; font-weight:700;
+    background:#22302a; color:#dfeee6; border:1px solid #3a5548; border-radius:3px; cursor:pointer; text-transform:uppercase;
+  }
+  .key.wide{ min-width:48px; font-size:10px; }
+  .key.correct{ background:#3f8f57; color:#04120a; } .key.present{ background:#c1a63f; color:#12100a; } .key.absent{ background:#20241f; color:#6b7a70; }
+  .wagain{ display:block; margin:16px auto 0; font-family:inherit; font-size:12px; letter-spacing:1px; padding:8px 16px; background:#22302a; color:#eafff2; border:1px solid var(--crt-fg); border-radius:3px; cursor:pointer; }
+  .wagain:hover{ background:var(--crt-dim); }
+  .wrow.shake{ animation:wshake .4s; }
+  @keyframes wshake{ 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} }
+
+  /* ---------- Crossword ---------- */
+  .xwrap{ display:flex; gap:18px; flex-wrap:wrap; justify-content:center; }
+  .xgrid{ display:grid; gap:2px; background:#2b4436; padding:2px; border-radius:2px; }
+  .xcell{ position:relative; width:44px; height:44px; background:#0e150f; }
+  .xcell.block{ background:#050705; }
+  .xcell input{
+    width:100%; height:100%; border:1px solid #33513f; background:transparent; color:#eafff2;
+    text-align:center; font-family:inherit; font-size:22px; font-weight:700; text-transform:uppercase; caret-color:transparent; outline:none;
+  }
+  .xcell.sel input{ background:#20402c; border-color:var(--amber); }
+  .xcell.line input{ background:#16261c; }
+  .xcell.ok input{ color:#7dffb0; }
+  .xnum{ position:absolute; top:1px; left:2px; font-size:9px; color:#9fc4ac; pointer-events:none; }
+  .clues{ font-size:12px; max-width:230px; }
+  .clues h5{ margin:0 0 4px; color:var(--amber); letter-spacing:2px; font-size:11px; }
+  .clues .cl{ margin:2px 0; color:#bfe0cd; cursor:pointer; }
+  .clues .cl:hover{ color:#eafff2; }
+  .clues .cl b{ color:var(--crt-fg); }
+
+  /* ---------- Pipes ---------- */
+  .pgrid{ display:grid; gap:4px; margin:0 auto; width:max-content; }
+  .ptile{ width:64px; height:64px; background:#0c130e; border:1px solid #223228; border-radius:4px; cursor:pointer; position:relative; }
+  .ptile:hover{ border-color:#3a5a45; }
+  .ptile.src{ box-shadow:inset 0 0 0 2px #3f8f57; }
+  .ptile.tgt{ box-shadow:inset 0 0 0 2px #b04a4a; }
+  .ptile .tag{ position:absolute; top:2px; left:0; right:0; text-align:center; font-size:8px; letter-spacing:1px; color:#9fc4ac; }
+  .ptile svg{ display:block; width:100%; height:100%; }
+  .phelp{ text-align:center; font-size:11px; color:#8fbfa5; margin-top:12px; letter-spacing:1px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <canvas id="scene"></canvas>
+
+  <div id="hud">
+    <div id="crosshair"></div>
+    <div id="prompt"></div>
+    <div id="objectives">
+      <h4>OBJECTIVES</h4>
+      <div class="o" data-k="wordle">▢ Crack the WORDLE terminal</div>
+      <div class="o" data-k="crossword">▢ Solve the CROSSWORD terminal</div>
+      <div class="o" data-k="pipes">▢ Reroute the PIPE HACK terminal</div>
+    </div>
+  </div>
+
+  <div id="start">
+    <h1>TERMINAL ROOMS</h1>
+    <p>N64-style first-person puzzle prototype</p>
+    <div class="keys">
+      <div><span>WASD</span> move &nbsp; <span>MOUSE</span> look</div>
+      <div><span>LEFT-CLICK</span> a terminal to use &nbsp; <span>ESC</span> exit</div>
+      <div style="margin-top:10px;color:#cfeede">Click anywhere to begin</div>
+    </div>
+  </div>
+
+  <div id="computer">
+    <div class="bezel">
+      <div class="screen">
+        <div class="topbar">
+          <span class="title" id="scr-title">TERMINAL</span>
+          <button class="tab" data-board="0">BOARD 1</button>
+          <button class="tab" data-board="1">BOARD 2</button>
+          <button class="tab exit" id="scr-exit">EXIT ▸</button>
+        </div>
+        <div class="stage" id="scr-stage"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* ============================================================
+   TERMINAL ROOMS — first-person N64 puzzle prototype
+   - Three.js low-poly world, pixelated + fog for the N64 look
+   - Walk to a terminal, left-click to open its minigame
+   - Games: Wordle, Crossword, Pipe hack (2 boards each)
+   ============================================================ */
+
+const THREEJS = window.THREE;
+
+/* ---------------- Renderer / pixelation ---------------- */
+const canvas = document.getElementById('scene');
+const renderer = new THREEJS.WebGLRenderer({ canvas, antialias:false });
+renderer.setClearColor(0x10161a);
+const PIXEL = 3.4; // higher = chunkier pixels
+
+const scene = new THREEJS.Scene();
+scene.fog = new THREEJS.Fog(0x10161a, 7, 26);
+
+const camera = new THREEJS.PerspectiveCamera(70, 1, 0.1, 100);
+camera.rotation.order = 'YXZ';
+const EYE = 1.62;
+camera.position.set(0, EYE, 6.5);
+
+function resize(){
+  const w = window.innerWidth, h = window.innerHeight;
+  renderer.setSize(Math.floor(w/PIXEL), Math.floor(h/PIXEL), false);
+  camera.aspect = w/h; camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize); resize();
+
+/* ---------------- Lights ---------------- */
+scene.add(new THREEJS.HemisphereLight(0x9fb4c8, 0x30302a, 0.75));
+const dir = new THREEJS.DirectionalLight(0xfff2d8, 0.55);
+dir.position.set(5,10,4); scene.add(dir);
+
+/* ---------------- Retro texture helper ---------------- */
+function tex(draw, size=64){
+  const c = document.createElement('canvas'); c.width=c.height=size;
+  const g = c.getContext('2d'); draw(g, size);
+  const t = new THREEJS.CanvasTexture(c);
+  t.magFilter = THREEJS.NearestFilter; t.minFilter = THREEJS.NearestFilter;
+  return t;
+}
+const floorTex = tex((g,s)=>{
+  g.fillStyle='#3a3f36'; g.fillRect(0,0,s,s);
+  g.fillStyle='#333830';
+  for(let y=0;y<s;y+=8)for(let x=0;x<s;x+=8) if(((x/8)+(y/8))%2) g.fillRect(x,y,8,8);
+  g.strokeStyle='#2a2e27'; for(let i=0;i<=s;i+=16){g.beginPath();g.moveTo(i,0);g.lineTo(i,s);g.moveTo(0,i);g.lineTo(s,i);g.stroke();}
+});
+floorTex.wrapS=floorTex.wrapT=THREEJS.RepeatWrapping; floorTex.repeat.set(10,10);
+const wallTex = tex((g,s)=>{
+  g.fillStyle='#5a5347'; g.fillRect(0,0,s,s);
+  g.fillStyle='#4d473d';
+  for(let y=0;y<s;y+=16){ const off=(y/16)%2?8:0; for(let x=-8;x<s;x+=16){ g.fillRect(x+off+1,y+1,14,14);} }
+});
+wallTex.wrapS=wallTex.wrapT=THREEJS.RepeatWrapping;
+
+/* ---------------- Room ---------------- */
+const ROOM = 20, WALL_H = 4.2;
+const colliders = [];      // {minX,maxX,minZ,maxZ}
+const interactables = [];  // meshes the crosshair can target
+function box(w,h,d,mat,x,y,z){
+  const m = new THREEJS.Mesh(new THREEJS.BoxGeometry(w,h,d), mat);
+  m.position.set(x,y,z); scene.add(m); return m;
+}
+const floor = new THREEJS.Mesh(new THREEJS.PlaneGeometry(ROOM,ROOM),
+  new THREEJS.MeshLambertMaterial({map:floorTex}));
+floor.rotation.x=-Math.PI/2; scene.add(floor);
+const ceil = new THREEJS.Mesh(new THREEJS.PlaneGeometry(ROOM,ROOM),
+  new THREEJS.MeshLambertMaterial({color:0x2a2f34}));
+ceil.rotation.x=Math.PI/2; ceil.position.y=WALL_H; scene.add(ceil);
+
+const wallMat = new THREEJS.MeshLambertMaterial({map:wallTex.clone()});
+wallMat.map.wrapS=wallMat.map.wrapT=THREEJS.RepeatWrapping; wallMat.map.repeat.set(6,1.2);
+const H=ROOM/2;
+
+// --- doorway parameters (gap cut into the far -Z wall) ---
+const DOOR_X=8, DOOR_W=2.4, DOOR_H=3.0;
+const GAP_L=DOOR_X-DOOR_W/2, GAP_R=DOOR_X+DOOR_W/2;   // 6.8 .. 9.2
+const DOOR_OPEN_Y=DOOR_H/2+DOOR_H;                    // fully-raised Y
+let doorGroup=null, doorBlock=null, doorOpen=false, doorOpening=false, lockMat=null, alcoveLight=null;
+
+// far wall built as two segments + a lintel, leaving the door gap
+box(GAP_L-(-H), WALL_H, 0.4, wallMat, (-H+GAP_L)/2, WALL_H/2, -H);   // left of door
+box(H-GAP_R,    WALL_H, 0.4, wallMat, (GAP_R+H)/2,  WALL_H/2, -H);   // right of door
+box(DOOR_W, WALL_H-DOOR_H, 0.4, wallMat, DOOR_X, DOOR_H+(WALL_H-DOOR_H)/2, -H); // lintel above door
+box(ROOM,WALL_H,0.4, wallMat, 0, WALL_H/2,  H);                      // back wall
+box(0.4,WALL_H,ROOM, wallMat, -H, WALL_H/2, 0);                      // left wall
+box(0.4,WALL_H,23.5, wallMat,  H, WALL_H/2, -1.75);                  // right wall (extended past alcove)
+
+// --- hidden alcove behind the door (z: -13.5..-10, x: 6..10) ---
+const alcoveFloor=new THREEJS.Mesh(new THREEJS.PlaneGeometry(4,3.5),
+  new THREEJS.MeshLambertMaterial({map:floorTex.clone()}));
+alcoveFloor.rotation.x=-Math.PI/2; alcoveFloor.position.set(8,0.002,-11.75); scene.add(alcoveFloor);
+const alcoveCeil=new THREEJS.Mesh(new THREEJS.PlaneGeometry(4,3.5),
+  new THREEJS.MeshLambertMaterial({color:0x2a2f34}));
+alcoveCeil.rotation.x=Math.PI/2; alcoveCeil.position.set(8,WALL_H,-11.75); scene.add(alcoveCeil);
+box(4,WALL_H,0.4, wallMat, 8, WALL_H/2, -13.5);   // alcove back wall
+box(0.4,WALL_H,3.5, wallMat, 6, WALL_H/2, -11.75);// alcove left wall
+
+// --- the sliding door (locked until a puzzle is solved) ---
+const doorMat=new THREEJS.MeshLambertMaterial({color:0x6b7280, flatShading:true});
+doorGroup=new THREEJS.Group();
+const doorBody=new THREEJS.Mesh(new THREEJS.BoxGeometry(DOOR_W,DOOR_H,0.22), doorMat);
+doorBody.userData.door=true; doorGroup.add(doorBody);
+// two accent grooves
+const grooveMat=new THREEJS.MeshLambertMaterial({color:0x4b525c});
+[-0.55,0.55].forEach(gx=>{ const g=new THREEJS.Mesh(new THREEJS.BoxGeometry(0.12,DOOR_H*0.9,0.24),grooveMat); g.position.set(gx,0,0); doorGroup.add(g); });
+// lock indicator panel (red locked -> green open)
+lockMat=new THREEJS.MeshBasicMaterial({color:0xff4444});
+const lockPanel=new THREEJS.Mesh(new THREEJS.PlaneGeometry(0.34,0.2), lockMat);
+lockPanel.position.set(0,0.15,0.13); doorGroup.add(lockPanel);
+doorGroup.position.set(DOOR_X, DOOR_H/2, -H);
+scene.add(doorGroup);
+interactables.push(doorBody);
+doorBlock={minX:GAP_L,maxX:GAP_R,minZ:-10.15,maxZ:-9.85};
+
+function openDoor(){
+  if(doorOpening) return;
+  doorOpening=true; doorOpen=true;
+  if(lockMat) lockMat.color.setHex(0x33dd66);
+}
+
+// --- pink birthday cake on a pedestal inside the alcove ---
+const CAKE_X=8, CAKE_Z=-11.9;
+box(1.2,0.8,1.2, new THREEJS.MeshLambertMaterial({color:0x5a4a3a,flatShading:true}), CAKE_X,0.4,CAKE_Z);
+const cake=new THREEJS.Group();
+const cyl=(rt,rb,h,seg,col)=>new THREEJS.Mesh(new THREEJS.CylinderGeometry(rt,rb,h,seg),
+  new THREEJS.MeshLambertMaterial({color:col,flatShading:true}));
+const plate=cyl(0.62,0.62,0.05,16,0xdadada); plate.position.y=0.025; cake.add(plate);
+const t1=cyl(0.52,0.55,0.35,14,0xff8fb8); t1.position.y=0.225; cake.add(t1);
+const t2=cyl(0.34,0.38,0.30,14,0xffc0d8); t2.position.y=0.55;  cake.add(t2);
+const topY=0.70;
+const frostMat=new THREEJS.MeshLambertMaterial({color:0xffe0ec,flatShading:true});
+for(let i=0;i<8;i++){ const a=i/8*Math.PI*2; const d=new THREEJS.Mesh(new THREEJS.SphereGeometry(0.06,6,5),frostMat);
+  d.position.set(Math.cos(a)*0.34,0.40,Math.sin(a)*0.34); cake.add(d); }
+const candleCols=[0xff5555,0x55aaff,0xffee55,0x66dd66,0xdd66dd];
+for(let i=0;i<5;i++){ const a=i/5*Math.PI*2+0.3, cx=Math.cos(a)*0.16, cz=Math.sin(a)*0.16;
+  const cand=new THREEJS.Mesh(new THREEJS.CylinderGeometry(0.02,0.02,0.2,6),
+    new THREEJS.MeshLambertMaterial({color:candleCols[i]}));
+  cand.position.set(cx,topY+0.1,cz); cake.add(cand);
+  const flame=new THREEJS.Mesh(new THREEJS.ConeGeometry(0.035,0.09,6),
+    new THREEJS.MeshBasicMaterial({color:0xffcc44}));
+  flame.position.set(cx,topY+0.25,cz); cake.add(flame); }
+cake.position.set(CAKE_X,0.8,CAKE_Z); scene.add(cake);
+alcoveLight=new THREEJS.PointLight(0xffd0e0,1.25,9); alcoveLight.position.set(CAKE_X,3,CAKE_Z); scene.add(alcoveLight);
+
+// wall + pedestal colliders (room is now bounded by these, not a hard clamp)
+colliders.push(
+  {minX:-10,maxX:GAP_L, minZ:-10.2,maxZ:-9.8},   // far wall left
+  {minX:GAP_R,maxX:10,  minZ:-10.2,maxZ:-9.8},   // far wall right
+  {minX:-10,maxX:10,    minZ:9.8,  maxZ:10.2},   // back wall
+  {minX:-10.2,maxX:-9.8,minZ:-10,  maxZ:10},     // left wall
+  {minX:9.8,maxX:10.2,  minZ:-13.7,maxZ:10},     // right wall
+  {minX:6,maxX:10,      minZ:-13.7,maxZ:-13.3},  // alcove back
+  {minX:5.8,maxX:6.2,   minZ:-13.5,maxZ:-10},    // alcove left
+  {minX:7.4,maxX:8.6,   minZ:-12.5,maxZ:-11.3}   // cake pedestal
+);
+
+// a couple of low-poly crates for atmosphere
+const crateMat = new THREEJS.MeshLambertMaterial({color:0x7a5a34, flatShading:true});
+box(1.2,1.2,1.2, crateMat, -7.5, 0.6, 4.5);
+box(1.0,1.0,1.0, crateMat, -7.9, 0.5, 3.2);
+box(1.4,1.4,1.4, crateMat,  7.7, 0.7, 5.0);
+
+/* ---------------- Terminals ---------------- */
+
+function screenTex(label, color){
+  return tex((g,s)=>{
+    g.fillStyle=color; g.fillRect(0,0,s,s);
+    g.fillStyle='rgba(255,255,255,.10)'; for(let y=0;y<s;y+=4) g.fillRect(0,y,s,2);
+    g.fillStyle='#eafff2'; g.font='bold 9px monospace'; g.textAlign='center';
+    label.split(' ').forEach((w,i)=> g.fillText(w, s/2, s/2-4+i*11));
+    g.strokeStyle='rgba(255,255,255,.25)'; g.strokeRect(4,4,s-8,s-8);
+  },64);
+}
+
+const COMPUTERS = [
+  { game:'wordle',    label:'WORDLE',    scr:'#2f7d5b', x:-5 },
+  { game:'crossword', label:'CROSSWORD', scr:'#3060a0', x:0  },
+  { game:'pipes',     label:'PIPE HACK', scr:'#a06030', x:5  },
+];
+
+COMPUTERS.forEach((c, i)=>{
+  const z = -8;
+  const deskMat = new THREEJS.MeshLambertMaterial({color:0x4a4038, flatShading:true});
+  const caseMat = new THREEJS.MeshLambertMaterial({color:0xdcd6c4, flatShading:true});
+  // desk
+  box(2.4,0.16,1.1, deskMat, c.x, 0.92, z);
+  box(0.16,0.9,0.9, deskMat, c.x-1.05, 0.46, z);
+  box(0.16,0.9,0.9, deskMat, c.x+1.05, 0.46, z);
+  // monitor body
+  const mon = box(1.4,1.05,0.7, caseMat, c.x, 1.62, z+0.05);
+  // screen (faces +z, toward player)
+  const screenMesh = new THREEJS.Mesh(
+    new THREEJS.PlaneGeometry(1.05,0.78),
+    new THREEJS.MeshBasicMaterial({ map:screenTex(c.label, c.scr) })
+  );
+  screenMesh.position.set(c.x, 1.66, z+0.41);
+  screenMesh.userData.computer = i;
+  scene.add(screenMesh);
+  interactables.push(screenMesh);
+  // glow
+  const pl = new THREEJS.PointLight(new THREEJS.Color(c.scr), 0.6, 4);
+  pl.position.set(c.x, 1.7, z+1); scene.add(pl);
+  // collider (desk footprint)
+  colliders.push({ minX:c.x-1.25, maxX:c.x+1.25, minZ:z-0.7, maxZ:z+0.6 });
+});
+
+/* ---------------- First-person controls ---------------- */
+let mode='world', locked=false, activeComp=null;
+let yaw=0, pitch=0;
+const keys = {};
+const startEl = document.getElementById('start');
+const promptEl = document.getElementById('prompt');
+const crossEl = document.getElementById('crosshair');
+
+document.addEventListener('mousemove', e=>{
+  if(mode!=='world' || !locked) return;
+  yaw   -= e.movementX * 0.0022;
+  pitch -= e.movementY * 0.0022;
+  const lim = Math.PI/2 - 0.05;
+  pitch = Math.max(-lim, Math.min(lim, pitch));
+});
+document.addEventListener('mousedown', e=>{
+  if(mode!=='world') return;
+  if(!locked){ canvas.requestPointerLock(); return; }
+  if(e.button===0 && activeComp!=null) openComputer(activeComp);
+});
+document.addEventListener('pointerlockchange', ()=>{
+  locked = (document.pointerLockElement === canvas);
+  if(mode==='world'){
+    startEl.style.display = locked ? 'none' : 'flex';
+    crossEl.style.opacity = locked ? '1' : '0';
+    if(!locked){ promptEl.style.opacity='0'; }
+  }
+});
+document.addEventListener('keydown', e=>{
+  if(mode==='computer'){
+    if(e.key==='Escape'){ closeComputer(); return; }
+    if(currentGame && currentGame.key){ currentGame.key(e); }
+    return;
+  }
+  keys[e.code]=true;
+});
+document.addEventListener('keyup', e=>{ keys[e.code]=false; });
+
+/* ---------------- Movement + interaction loop ---------------- */
+const ray = new THREEJS.Raycaster();
+const clock = new THREEJS.Clock();
+const PR = 0.42; // player radius
+
+function blocked(x,z){
+  for(const b of colliders)
+    if(x > b.minX-PR && x < b.maxX+PR && z > b.minZ-PR && z < b.maxZ+PR) return true;
+  if(!doorOpen && doorBlock &&
+     x > doorBlock.minX-PR && x < doorBlock.maxX+PR &&
+     z > doorBlock.minZ-PR && z < doorBlock.maxZ+PR) return true;
+  return false;
+}
+
+function update(dt){
+  if(doorOpening && doorGroup && doorGroup.position.y < DOOR_OPEN_Y)
+    doorGroup.position.y = Math.min(DOOR_OPEN_Y, doorGroup.position.y + 1.8*dt);
+  if(alcoveLight) alcoveLight.intensity = 1.15 + Math.sin(performance.now()*0.008)*0.12;
+  if(mode==='world' && locked){
+    camera.rotation.y = yaw; camera.rotation.x = pitch;
+    const speed = (keys['ShiftLeft']?5.4:3.2) * dt;
+    let f=0, s=0;
+    if(keys['KeyW']) f+=1; if(keys['KeyS']) f-=1;
+    if(keys['KeyD']) s+=1; if(keys['KeyA']) s-=1;
+    if(f||s){
+      const fx=-Math.sin(yaw), fz=-Math.cos(yaw);
+      const rx= Math.cos(yaw), rz=-Math.sin(yaw);
+      let dx=(fx*f+rx*s), dz=(fz*f+rz*s);
+      const len=Math.hypot(dx,dz)||1; dx=dx/len*speed; dz=dz/len*speed;
+      let nx=camera.position.x+dx, nz=camera.position.z+dz;
+      if(!blocked(nx,camera.position.z)) camera.position.x=nx;
+      if(!blocked(camera.position.x,nz)) camera.position.z=nz;
+    }
+    // interaction raycast from screen center
+    ray.setFromCamera({x:0,y:0}, camera);
+    const hit = ray.intersectObjects(interactables, false)[0];
+    if(hit && hit.distance < 3.0){
+      const ud = hit.object.userData;
+      if(ud.door){
+        activeComp=null;
+        if(doorOpen){ promptEl.style.opacity='0'; }
+        else { promptEl.innerHTML='\uD83D\uDD12 LOCKED — solve a terminal to open'; promptEl.style.opacity='1'; }
+      } else {
+        activeComp = ud.computer;
+        const c = COMPUTERS[activeComp];
+        promptEl.innerHTML = '▶ LEFT-CLICK to use — <b>'+c.label+'</b>';
+        promptEl.style.opacity='1';
+      }
+    } else {
+      activeComp=null; promptEl.style.opacity='0';
+    }
+  }
+}
+function loop(){
+  requestAnimationFrame(loop);
+  update(Math.min(clock.getDelta(), 0.05));
+  renderer.render(scene, camera);
+}
+loop();
+
+/* ============================================================
+   COMPUTER / MINIGAME SHELL
+   ============================================================ */
+const compEl  = document.getElementById('computer');
+const stageEl = document.getElementById('scr-stage');
+const titleEl = document.getElementById('scr-title');
+const tabEls  = [...document.querySelectorAll('.tab[data-board]')];
+document.getElementById('scr-exit').addEventListener('click', closeComputer);
+tabEls.forEach(t=> t.addEventListener('click', ()=> loadBoard(+t.dataset.board)));
+
+let currentGame=null, currentComp=null, currentBoard=0;
+const objectivesDone = { wordle:false, crossword:false, pipes:false };
+
+function openComputer(i){
+  mode='computer'; document.exitPointerLock();
+  promptEl.style.opacity='0'; crossEl.style.opacity='0';
+  currentComp = COMPUTERS[i];
+  titleEl.textContent = currentComp.label + ' TERMINAL';
+  compEl.classList.add('on');
+  loadBoard(0);
+}
+function closeComputer(){
+  mode='world'; currentGame=null;
+  compEl.classList.remove('on');
+  stageEl.innerHTML='';
+  for(const k in keys) keys[k]=false;
+  startEl.style.display='flex'; // prompt to re-lock
+}
+function loadBoard(b){
+  currentBoard=b;
+  tabEls.forEach(t=> t.classList.toggle('active', +t.dataset.board===b));
+  stageEl.innerHTML='';
+  if(currentComp.game==='wordle')    currentGame = Wordle(stageEl, b);
+  if(currentComp.game==='crossword') currentGame = Crossword(stageEl, b);
+  if(currentComp.game==='pipes')     currentGame = Pipes(stageEl, b);
+}
+function markDone(key){
+  if(objectivesDone[key]) return;
+  objectivesDone[key]=true;
+  const el = document.querySelector('#objectives .o[data-k="'+key+'"]');
+  if(el){ el.classList.add('done'); el.textContent = el.textContent.replace('▢','✓'); }
+  openDoor(); // first solved puzzle unlocks the door
+}
+
+/* ---- embedded real-word dictionary (Wordle validation) ---- */
+const WORDBLOB="rossajettywizzocuppacohoegurkssquadbeisashrugfossafluytcamusspeedmamilarraypoliobarnspanessoutslimasfetchquecktwinkgrazecrockalmudoohedcologwishtbeardsamelahindbrungbarcamahaljambeplushbrujahowremiddykababzealsmazelsputagoorypailsscogssnoolpoboydoestorixaquipoburbsgoadsblaudflocsharimmameyprimplathylunesstapssaladagonyguslidampstockshoickmarryamplygliskpulisaptershellcapassaunfkutisteggshalshgammatardyteasetowtsabutsalleechinsrollysitusbardsphymatorrschacebikkystoorquinkwedgyvisessworeupseegyvesheapygilasgairsyonicwagonranceswaillaxedpannetabusanomyswarmswordpharmpenessnoekrazetnahalkapuslokeygobosjailsafarsnerkacundysnarkintrabundhtangabaaedsolussenorumamiwaredsharppewedtuktuknowddawdsflurrinerttaxusruanasulcijadedothylredigmankyovismmatloceaseperaesixespubcoyappyfamedhexedbawrsdecryiddahdixitcasedrupiatoidyhodadyukesgaffeannoyleughhowaypixellingabayoulurgylearsscratprizehomesscrooegestmopusverbsmaplebarfsjudgesalleshinezinebflexogismorearskhadsbegumgladeimamsstradvenaeskenemotenrugbygoelskhazibelitsmoltmorinofayssuraljannyshortswishhaetsownedmuskygimpsnodesleftyfurcaexomedribsgoukssmewsmuntschirolearnmocusslimemokisnevisarcusprigsrenteyferehikercrameirkednairastirenagaspeisymiservivdadolieweaveumbelbarmylounsdidosvioldfowthguqinkayosfincatathseliaddortscooeydictybobaklowsetuilelakedtartsreefyagamathingshorenicksnunnyakoyasnawswritsdoubtalivebeautibrikhempstowedcroutmogulhalidpeckyechedmusitcouthacrondynesgothybundyseepsdeepsplenekukuspetreputtodarlswarpsshojiemojihikedomitsrainyfillszinesboresalgorolivamidgevizorhaftamullapaledkneedfibreptishredanexodezorrodrollniecesegnosceattunesmomperadonakkasjowlygandymediikneltevokelowtsteaksbuckogroksleafymesessyneslathszedasblankjapedvoledtoxicreachnazzypubsypedrocucksbaithmagasgompabilbypopeshentsaurasgiddytacosonnedbowedtsarsslogsgrindmorelasadaweekewinnaammansabjiruntsslopstreadloofafeverglovetristcrepspheonberescorsosofarreezepisoslamestreckboabsapplygratadaalssoyasamourgernedudesnifleagainslurpulnarettinnolesgobarbohoskawasradgycoatiscailhelotmoteltidescovenjaseyflownurubukiddonrtyapinnacurbsbotascycleyugasugaliopterlaveroustsootideasellewisrenospanedcunitmuilsjehusebikecotchuppertheorunaisidiotmanessawergazooedgedpikeymeechadytsboiteixiasaliospadlelotahragaspudusmearegraipquacknoiselivrephemechestlinedazlonwavesachoovalvemawkshydromuxedetudesmithmendspiscociliaalgosneneskarmaneantvisievolarburrodoethecrusdekesseepyfactspoursgambomensasweptoafosshockroamspottspikertingsfountdauntbattulicitciderfordspalmswheepcopeswhelmusneastaiddosaipatkagamasdromelicksaldeasnowyquodswakersyphsstummchoresiltstopeezeinslikintopicwavedworseanearrayahclipeteloithespdustspoochluntsvinnypurdazondawidenjontymosedhussyescarappaytonictavahbudoscuresretiamaileundeequoisvangskytesrendstaigaabetslichtpotaefunksrepassichtmobesceorltortesnarlmightgenaswashyetatsboinkperogcodencrownmoityhelosmurkygaittdancegraildeadsmivvyfugioursidburinmimsylotusfronsdurstdevisparaemandssarinethicwhirsbriberortynymphbillygighekalifbredscuteymincymodocallinyesesdwalmbalmsyuccacyderlopedkagussmeekylemspeagscompsnoblycocoapedonhitheetrogdumpsmagicbendyseelyspawnoxidshakusgradsabacsfocushideshayedstonyslimstonkaidenttansuwhirrglikevotessigricadeslayedsnailfykesousianevuswingstoilejuntachairregialavvyfattybippyhoodybuncozupanspendphubsslusedwinepietypyrusmogueglowskutchnganapitonspaltqipaopakkaredlyfurzyarhatfumeraddincardyzooeaclegsdhalsdeshimeanylenoscinessneapbustibeltsweansglobedecadtinksballyyokesonsenloveriddatterrypogeyplanhlottecliesfemesdeedyacnesrublilolosrapesmansewipedsabhagamerafearadrawouttaslapstarkagoyletomiamisdosayeepopsywatchripedbathstailsdinnaconinbunyaskoolkhorshulkslacetlazesseamsslylyjoinsdoatsprokekingyrannyrakerswoungularsedumoperapernsrediatekkeappelwaistboldssteerpodgyhumfsstagyopgafskeosswerfrhytapiansulansdiverpennynanuaonlaployalbohealirkssentipleondamansynedmoolsbakedrungsbracemelbasottodealtbikesfecitflyersidherengsalkydveneystragapodeaigastortssoothsteanalgingummyndujaratandurumaciesuniospuntsfilosblypemolaltiararatallowendawtsiddutindewsurfsbrimsabacitrokemimedroshaelatetilakcycasornisjivesmercydimescriesaffixoughtansasbestiromergismswhichlogonweelsleftsgrovehunkypetersorexonelyhinnyfoliebrosegadjowasteclashbaloifiatslaighsillshocuspensyoulksdruidtiddyfilaroxmenspumebarmsherbyspazzsnitssingsturdsstiveseseyreiksbotewmacascloaklocumpardsfoveagrotsyeeshwalernuddywudusbearecavedunsaytecummythilucesronnegeldsfierihyenadunnosculpbrocknittogeekstirrsdoreseringlimpameticabersbegungimpyposcastolntupleramusmahemexposhenceantedfubsyquibschimofernsfossescowlavershurrygyredmesemgrandfautsadapttapusruachjeuneglumefiqhshundocoughseismninjacrosssuetelotasbondsjugumbraysoldlybangsgungedenseimidoelopsgundirollstayranabbyhypharibastarzywazoostyesrayasmaystskierslumprilesmudarpowanseirsraresfanalaburayabbaagutiheatypirlstonedunitsnivalpownyrybatpoultrawksmeumssoberboersghastgrapymotonackerrohespilchsnarfwexesaspictassahioiscloysratiosipedamicepatiagawkycrawsbunaskuzusdetagteaedorpedsmerkgyronhasksnettsniffshopedbokosrisenzanzegripyhechtduplecratemahrscolassolaredematulsicouchhastaequesdoperlokesfloutfrizethewytzarsblowsscriparcedsixtyizarsbiomekikesversttrifagyppooniumsowfscrofttanhscansolabrabordslilosstichhangiararshulesboccabidisweepsnevelcamisiraterasambarbycampsnomosadieufurzeassothamedspritmingielbowkriolfawnsgurryruddsnoelssearsskyeysetershoudentreinklecantyjelloconexiorasonerybriostsubakotosanilequeyuredonwrickveinsblitebaresjivedambernapesewestthornmatralethemakesazymecaxonrairdunketunagidexiechosealickroopybuchuloranpulpspasagointsriteskivasfarcegaresrannsaygretopossamenindierareralkylsurascommolyneswarbyabbestasesnobbyilialscatspaulsbergsbrondaeriedrosscutinpearebargepogosscrapninnystelafidescallapyxedloughscragpannishrubaimerskyedtriessoilyhijabcuberguanssuprarhieskecksspadosmeltwheatsirisapsosfleurpightfycesspurspelfsanentknivetawseadvewcrooldwangcrankscalppincefrapsopinenatyafiredchelayartasoweravastswotslobosboardfoehnciterovolosarostawaispeerrelayretryspanefelixsimpsgavotmeintvizirfaxesspitebatesmodgetrackafrosresaydaubsimaumhilarperilcalpswaveygoavebennipobbypatteheilsamortsightroadsbiderleechsippyfutonowrieregiegamingrimypolysjiffywadgeclimbchiefplayamiltzsellebialyzinkecouldgobisroadypimpsgeninpeckeardebxylanpileycomerbimbocaredhuskssirupbidetdrapeflailexeatborakzillapellsgrithlankygynaebyssiincussocksvaperfohnspunnyteloshapastheirrunnyzonalclasscymolsquabpygmynonetchokonudievolveviffsgowfschuffloperparerbingspogueknownsoomsnunuskedgecutesgazedsteamzorisulnaenicervivespoggykitercowpsponzuephodwindytestaenvoijeridglozeestopcoalsrunedplupsclickwrapswiggyradgechoutaltardeburswoopsetalscentpearlhakeaomddawylesflungkerbsnonisbenesmatsufliskswapsdernyslunkyackatwirpvirusmechafrenadonnygearsulpanriemspranaretipspeckwhangboronquellsnipsfontskangsrafikawarnpukeselpeeskuasbanesflackblasheagerarielskerspiousunmanbindibaelshornslexeskyangvocesfruitiotasserrsborksnandutenthquoiftoyosmerlscamposmogsdramaoutdofangawoodsyarcosnakyfaderfendssogeroxersbeediusagelendsstewsprawntauldblursyirthkioskgrepsspackpaoliraidsmusargloamnoriasuluselainanklebiffoscuftnurdshaulmayahsbeginlaxerdebutraspscarditozessonsyaccoylosershivewerfsartlykyndshealsrincearpensabertalcyslangmecumapertfliesskinslozenrevelpoopabututidolakhoumkipassensapolesdomicyorkstowsyenzymmusthuhlancrimegullshammyyrnehovuleabodewifeszamakpayedfernychefsemboxglomsoratemradstuftyblawnlouedowarilianalackafusesjennygregescutagentsunletseazerabisfuzeskaikabanyarefedankhswollyricedrouenrimesphonybouleninonepoxyisletredrybosksgadgebiffyshiredefogkurtakandygogoswaiftcovescionstakkyshiaipavidtakerexitsrolfsoureyglugspoesyuratewexedfoniocremsnitrobubbablinddemptdowlydrovesniftacrespaschwoadsabandcaulktaxermarshcavasfoamymurexspinsgomertelexkronaapronpaceyscampdawksmacesroilyherdsomdahclogsroneouncusabashlaurakawaulaldydaultroscocentumetholymphdonsyparteneveroutrecalfsacrosmalamwrathtoguewoolsorganwallamergefizzyhevelnawaluraostossyivorysoddyfinisspulegookstodosphotsblobsnancyflansrayletinaskanzuprosspeekymizennillsvomitingletaperbasksdelospipitcoquivitexnikauskieybetidwhelkpindsskankdeashkaieschevysirracupelmuvvatamerabsitmuthapianosquidmarahmoupsvoletcoramfaverwoolyfiftypombeairerspoutpussygimmezoealfrornphenemulgamiaouquasisokahvestsdobleromalmappyobolsposedoosessteredecanfaunanatespayeejaspsdoilypeentgiblinasalorgictowieroakysurrastudykanesbrerefikesuntaxbecksfleamtortaflutybuteopeciagooldnurserebabvouchmimerallylhouseidolsfellswombscystsosetrlurchcoudenarkspargospickgungyixtlejawnslollslimbsthagicluednoulsmilosgoatsmailothinsporgemuktiajwannorksgulphgrabsokehsavyzedellyheuchbaronpharewiresrakisceltscoderpitchdoreetemedparrawakensuingcirribulbsjokolmeltsmetroirokoashengawpspavonpreespiezolodenacornohonebemixsoilsguffsmandychusesneakgoogsquawsskeevnoncyshartjibedrumpoquinabourdminsewatapshookewersnewbsghoulhorsyedgerklangraffysporemororveepsmammashoyuobesestashkaraiiambishinydansekoraisdeinfavordereslotsaoupedkhanabreescrudewastsnomesdegaswooldeikedhajessnowkbittscrissgonofhajisapaydprostraunscuterrivedtuskyveggolexisflingnauntwovenhippopeltsuredobritheildsbhavaloidsturntfluorlyardbelonsahabsmiteyaccapallsshetsprevedillivairycowanlithefieldklickfayresnabspapawgoaftmissyspazasissycloamwilisabrissayasblonxwrastknaursadlyfastidiscsturnsqurshbaizeburetpuffsalbeeredesboatsbubbestewycoutasunnsraiksdojosswoptdreamyuzusratelferergnatsimbosroopsselfssalasskeggphasmcuifsjustegiftssilereaslesaltotenduvleisquidsrandogudesmeselwiganmantoniozadairyquaisspirtsileskreeppicksboepspeinstearstuartakoiazowiemavenhowsobudasdailytamisyakkagroinvexedtegusmakaititleseferlumpydakersnakeafritziganstipaananavocabnavedfroyopilaradmitbowieidiomdrawlburlslancecruseseatskelpsblaerchiveneumethujamuggsnasonsnagstorasbittyredidreletskirlbevueboccidenchseedyeyotsvelarpikesneefscuingrecepplatsyarerporksrudessavorguarshazelchizzgeistrotisbastauntagneedypickyraxesmoranyamenparengovesechoshomostextspegosreensneliadbagsaugeneorlshingechirpallottubarouzeldalesmurgikidgemizzytepoymaraehoofstophiphasecackylichishyerbihonfiloneagletwanktriorelutepelogrelaxdartsfrausdeereturbofainsmoersfeezecrocistealmodemgeniodrilytodayrebuygrowstangyquonkdismetaatabwanasnipyfustsgluestiersherpsimmitbennyanoasdoorsapgarbournebankhallohullsfendyqueekhoopshauteswardpeageshevaketasrumesagersmeadsaspiemimeotundshoisemeasepridyboralsteddarealdowedmutesmylarsloshidledspugsazurypuddykaingtwinykrewefreonmangscrassorristokosclefsogginbhoothyndeverraiglooqajaqbetaslisespappyfocalpicassolesaingaouzoshoachadawngluggbashanarkylinnyshayatrayfmopedeaseslairdbeadyjurisagismmeansvogiecedesbunkonaricpeartquerylearecarbyindoldebyebykedlaarfkoftakapasoliosroufslouieplewsspawldarziquollcelebconvostoreskarnvegesshadenabespirreblueybreakryperfaeryhoodsamiesheatsumbrequietgleedwanksgurlsnikahtazzekoruntowzeblamsfallswairswilgakwelaaapasnavvysaporrotansakerlegerxericcyanogarretomesjudgynainstimonbevandualsurgedazoledoxesflabsfavasviverlargamanustouzestarsknobsyowiejibesavionfrozetenesnexusobolecoomylookswaltzsmokedregsledgekaylecoupschartlytesmadamkalasbentyraftsvincawilesbilbocharkcedertentsvirgobisksminesbuhlsmavisyolkykeakisirihfiefsdikesduncemevesketesheftyzooeycritswivedboglecawkschavsduomitewelmesylbalmyhylegacarifeatsmeakeignisgongskartsdentshaffssakeshornyadradrebudyayasshierunmewplasmloastpuckapivotworksskeespalerknishniggamadarwakfsruchetoddesauryroughknopsakingyillscymaebrentumptymellsmaruaimprohowdywoopyaswimbrankpinkoginnyvowelreemseiderhypedjeerssincekachawhiosnarisaurumawakefullyrathescopsarveewrongrompyswineramesgimelmangewiftylevinchafewennyqueystokaytardopolarpendsashesmopesvisnelasederosecoltsraperdiramgyrusjakievuttycapesnumenextrajowedcosedagarspiquetalarbedadmandiunkutdullsslootbawlssowneplenorebitstrepbesotboonssewedlatahreproboohsflapsgirrsvestahyensanyonbodgemodomyurtsexileadretnoyeddyadslongetridetradsgoffswheysshojoayayarisksrepotdwaumakaraquankshalekiefsclocknerkscalmybobacpoutyjinneanticangelwhamstaterspodsveeryheameunmetephahtonalgonerpauasruvidmaisteruptamoresickofellyjimpycromesiseshoneyvacayrentsfenkshoseypuffyaskarpateedownyaphiddonkovampyrainscrapsamahscravebossaacchadeelyhoonsrizaspradscrowscasusgregokufisdefisplebsbaytsfogoubloomtiarsagonshovelrokercodexyajnakinostiyinsalsereorgstowssposhenderrhemetirlsfidgekickshapaxfrierbarnyblurtforamcowlskormasparkedgesneumstewitcapaxhuiastertspineypadammiaisdonorbrickplazapulaoguardkindasquatyesksecardfritssomanaswaymajaspupaszamanduroyciviesetonamenestymysubasawariaxonegabbyflarytwalssquizduadssoupydunshplootputtuanlastorchhomedserowblogsagisttankaprimavoblafloshtamasravervegasrovesommelgodetsujeecernehalonaxilseatendormschivasonnekingsroystalbumgroofbuddydinicerhusquoitvittacoxibtithibemadgoutschiruwodgygucksricinlimanownerspoiltrewsgawdsowniogramsvaxestrigsleetsquemelaxlydhonisidertablsspuercoredmeritwhewstreifelfedcorginewsyidylsprayswightgarrichadononnoglazytengepavesplinknaffsnonaspipidmaikssmeessuddsplumpceredmoonstarsebewetabacasavedscrabbydedmalicsadhukarostranspokiedouceelegycontoobeysnilasmerryfixerescotpoisesoyuzraisepashmrortsbongoatuasaskerazukifalsycubebaquaswolfsannullugedsmugsdraftlitedpichiweilsgratewhinssievebokedpolloblunkeskereyrespadasileaclawnycymasgutsybombszawnscrieracersguppylustydatedrankerustyomdehtamalremapwershtorcsproasdhollenarmloledwhearcuneicosetraftyjavelfifesgriceapishidantlociehilloslawscentsplainvoltagundyrineskeroscondoasanaspinkpsionyawnscoyerthewscarlsodylechalsdarksfatespongshoyedhalalsorgoiconsbaftablateparesrowelhelpsvakasthalillanowamusdozesmoblemyxosyearnraggaliltyunpaynigerslankbifidgaumslacesbekahfientnowdsvitroshylyhelvemurrsfirrymairslindytuttikareemoboslabisplukeinseebasinwinchabouttizesgenesprobeumiacspaermootssewengruedshistperkstolusafirepomasmapougulagarikijupesfalsenellygitesburrysendscanesbeverknawewongalimenpungostaigtwerkthumbresidcopaystrewoomphsaggykaidsruersnavesvirlsseverpupusettletipupollaswallybullyswangdoserurentpocanspileoccurrisusmakafsabotyamunmataidurzivougemackagrrrlavelssortsglidemenescraneazinenosedxoanauteriobelitrotssimbawirerpartypotairegesgombogrumehawedwagyuupbowmaresnusedsynodhemictwerptrymateenyuvealcrepthyphyperstlordsbeganthrumnocksorneekraisiglussloesapolscyclobackyrichtmoistdroidstandboniefetusterasblarenapoodicedmaltsshendboarscharmmayossuetsantsybrevepinassprugrecithaltsdatermogosafoamploceinulasetaeraddylawnsgenipxraysrakedmaximreeafswalewillsmidisscirestonnkinkszerosvatasdogieserrypepsiviandacenealoftbealskanehyirkspiledbajralesosreninbonuswauffcrinklysesknackreconcannsdevelspaydthrobgaperarisemoderbluidberkoagilekamasassaislitsmattespadsstoolasheturaeipullsfirmsmouleroberbydesmodiiealedtachebebopswaptguavacurlysolonarguecovetskoalmossohadedshorldoupshivesbullstrucekatalthugsarlesdrownskagsbabelrevetnovelalayscodasrachepunjidoukspotsydiolsamnicevictbaudshostadowiewizenmicksshowyzoeaetoxinnodedbleatkiaattoyedazurnpupaegreesoopakyahoowistsovolipinesfoamsnevespurisservelovieysamewomasrelossepiatradebutesmicraweiserecutrisermbaridowersakaioctasdannydivotcoolyscapisalsaexulsscudilegesvisitfarlecrestfacedbukesmouthbassebastsalkinmausyforksdoshareelyjunkscubedplotsdrentcurfsgobansnidetarosfuntsniffyvairsnoggytogesleveregersrokosinrunplatyantresabalcoccopoucefugisranesobangthripthoftbastestatsmomesocotegloopadminoozleslipsboordhilussmarmalohanatakknubsavertdowakbruckbisononkusliborgiveshardygreetcraftnarratetriampleawavethanehalesacarabraksmowralassykermashlepwordsrathspaansaftosalongfreshnegronukedgatedmanisexonspoepsjoualmilkoazidepoakemisesculetpizeddykoncrunkwhosebogusmovedgyppyoscarlispsdandamischngweeryotiswaylsnokeaworksopraalleykideocremaspaedmiredideescuffsbanedstyrepoirelackyakitaclimecurstwadessavvymusksstellsatiswussyzingsernesclucksususbeachsaolariftetabuncronsinfersypesbuildunfedpompsmohurhoserautosunsetneathmactewhistacridecadsmambachocssmushcytesthanxringsvinoswofulawashbayerboodyalansbirzzcampyretchmotustaishscotspanimethylknurscootsdacksmungeungagelandequipeliteunlaynonylroukyvarvemiltssoaregeckofillyjillssaktiscrobtropeseralatocssarvononicmassepicradhabasensifiberdarnsbougeraylstintsphutschoilvivreosonekempsholdsbendsdatilhotenslumsamritgougepikiseensyclansdoughscadsblameghyllblisstumpsbudessenzagyresvertefluffdhakshuzzyomberpionyleamsamoveunbarporusooaasjantyleeartrulldroilnittasaveyqaidscaphsbrawnwokkamumphratashexerlucidoobitpleatholksyouksdashileapskillsskeinshoathurrajuvesstrowshaltlolloduxeschiastinedpleadpricyvaneshazesremenrushyabyssvaresgallydizenwedgekangahahamnuquespurnuntillareemidstnakermenedkarsymaskspucergoorsknooptickysargosplitskeenstoodtogaeslushpriseealeseaterglaurprexyraffswekassnoutcourtileuspalsysevirryndsducalovelsjuicepletswoofypantytalakvinasbapusweberoleingamedtolancadeehouffbizeshoovedaredpoufskudusurialhikoisoaveficesramietammyrareeigaposettstarsimuledchimbemmasacuteumrahyieldmirexgriftyabaskileyreranfestypingasearemelamunduesignalimbiperspcrampmikosveersmoolisackssturtchunkplaasstokelowlyturpscongopoledchayayeadsguckytacitbordealulanegrideerstuckselemiawaysbethsofurodahlsmorraabearslayspongypurpydoblableakgeburoojahpandyunoldwheengleesensewheryenodumfloorvoltibedewaulasabatesornspeltanaamsdoomsizardclunggorsytagualurvehejrampretappamduresemydslemurhaafsgaitasowsegamutslothlowerazothterraholtstaborshamshighsspiedragisbrogsligerwelchoxbowtreatbagieoslinrutinpiroghusosplanscellihinkymodinsikerladerrajastarocdebelgladssacraazurepaddyrefelsanadcreinbizzodroollubraspansguttawhinyjoramafarajiveydowelpizzagoomymantaqubittidedfiestollavslinkwhizzhadstcorsealooscotedtaminavisectenesidesstowpwaitsgoveddownsrikwadecimpeepyrozetdykedaportthermbotelwhitycachescrodrapedpooribraaihelioflankartersantoliposlapasbossyosmolsumisturmscornobibbsthridspahicausetaikoallaytimbokneadpyxieterzanoopsmurlspilaushahsreccepremsgabletroutglodelitasskugsfagotcestinintaauraewurstpooedyeltsdivasmoodyticksulnadboldopervsdishycordaracksbaddyprestkylixzoweecuecaiminodraysmoronquinsdamnsbloatjebeljetonpukuslyinglatkewaspssnugshardshobosdightlairseardsngapistelebivvysmitsakeneepeesbegotcurdykibbibolixmachsspotsscursbowerperisotakuaheadamaridongagagerriotsditedflotedantsspreehogenphloxrotedcoylymeatyhududlownshivedcukesfidusseaseyakowmannytatiejewelmoralreestgoafsaxileployscacaosunksthuyanewienashotritesmilyleudsbrillomnesbodohsloidjaapsspiercredsskiostopertubaeglobsheveafedaioreadtophskarooabiusnerfsemirspockymoylscharsallodbravopaperloppypouptbladeagapedingymirinheftsroynegromsmanteczarsyeahscomaleathegalvonextsheronfavustombsbroghsulfomothyrovedjetesrudieazoicdalekhoordsuntscreekongontotemwalisholmsdattoslakeataxyaimagyokegajugamagnafirnshethsnoiasarilscooedmawkylemmajismsswinkrengababeshylasgrifflutestummyspeugcrabslappybrustoccamerodefilmichaatburghhoaedbarkyyucasmiasmraguskebabsweesloirslattejihadglairscallnukeslumpscroonacingbletscarnyyoppomudrayellsjocoscajoncecalsalpsmozedfoyerfirstsymarkukrikendodrockfellalongstoffylaserderbysneerzinkyabrinnammawiltsfactabalastunermanebzamaczootynusesdramsjomonavgasmettaohelojackyhenrybowrsthymipshawpungsvrowsseamyfiliicolorschulamokssummaslutstratsgarbenomoinoujaclitsdroketruesmadosorthozendooontswocksroyetindiaswiremapaulemonaxitechyledopeypissydotedjujusnowtsnivaswagedquirkstogyeasersolanlimbyablowkombucaratditsysidasgurgeleggyforkybidesquilamachioleumelvancrorecrazysaagsrasesscifigoestexecspeaksbrutswanzedorisorangfawnymyopyjambsputoschonsdracobowlsavoidfiledlowedqualymbarstakesmuffyskolspettyyatesnuffsdriersneesbhaischirrlauchsuganmeithspikepoindcoactqormaaghasnohowmaftsboaksseifsriffymixupvolksiodinrerigbezilhayersumoshabuscurlsbottebloodmobbyloutsodorsswizzdadosbornasnibsattichockssalicfuglycurlirytheloomsshagsacylswrensprekeswedeobjetbijouohmicbosunprismcriborobursticknoblepoljeinfixwankylestsbachacadetbicepstriahonerstoaecruetribbyswobsstifffenceprimefittesnubsgoopsmathsbasijpumpschaptesnesbhangisbashejabacredpavenbhelspolosvezirlidarfolkslunkssnortfeesechokybuskycaplekikayseilsviolsymoltflawsdoxiefuzeewishaplackcerosoxeasscamstheiclimeytapedrafiqseeksteensheidsimpedgrigscozenbardyphysafundarassedadasopsatcovedconeywrackkayakunityryijipastecrispabampgibedcosiekazisdolmashotsdowdysumphterekcyberhoolysanedneozaabhoradukipizesbochebailsmodelvoxesabaftthankrippssluedporedcrombboorsretoxcootypalpsnogalwombytuffssweltkeekssikeskilimnointnasusvexilmilpalapelnifesgnarlknickplaigsanesbolusmsasacakeswarkschucknidussniedchumskitulfoursmoteygirdsmvuleskoffquasheffedcushyhexadmerestriosardricoomsmusercopenplonklingyawatoneuksmitesspentcabobniopoablesrotlsnjirlboyarikonshalostoilskipespucesthickunhiphalmadurgyficosbeveltakissluesteinsteiidlaidenuderfujisdarafturrsgeasabidrileptagentysugosskinkcrustbadlycrocstartybionsmournchawlbodledeignpulutbrawsgabbadreerchordprasetempostansgothssidlezoismthraefadedyawpstoastsybbekibbemockssorrynrttalarchrarkschampkeviltweenriflevadedjokedhackyminasevetsgolpsreedyselfynaiveflunkspasmbrackgulasslaidluffabosonrolagmikesfriedskeedsordashopeevohemikancubbyeurosfautebrokepankobaozifeltsqilassyrahbolarexaltmonkstoshyzebecmacawwhatatweedtharmsookyfiscseskarmoustvicedpiggytroadjazzylacisgnarstawerchoonputonwinzehailswaddsdelfsmenshzebubgoodybahusadliblurrypibalskelmdriptperesfillospidearenapapalyoofsouphecrowdochrypokesconfsposetadiosgistsrawinstankthebemediabhatspeisedecorstoptkoppagloggzakategretaminespeeloakennooveyukkyfechtnyalaotteraxionhendswaldozincoeldergaffspaeanskatsdenarintelenrolgatorcaponfoldsblestpannayojanneighcultyzatisxolosgazonliftsjirdsshtaraggagtalmakhatsfumespoohykulasdungsweetespeosdodgykourameffsnoyessysopjatosbandhdewedbeanyjalopflewsantespestoboylalaternichemesiavakilaflajelogywreckmoriachavasleepkitesnantytempsmutasbrigsflockfemmypoufyaretsarmilbayleforelfleetkeltspoachforumsughsphialmakarduralsumpsslewsmuniswazirgowkssablecoraljoyedbalunjammyshunsarglelochshersedwileixorameinspuzelgammyallusmaurifeistunredhubbypinksfubbyergotscattresamdoorntoriipluesnovumpinnyversezonkseticsorfesexceltronablandfrustanoleennogfoinspratysplogtoddyhymnssowpsbalusluckyspilttactscomiccaeseunbaglaudsgashyvibeylaersgnawnpintamokusopihirewinmelikmokeygaliabykesoakumarosemetedskillthroebaalspartsbiachbousejingsjathamyallcoupeadeadparisguessaliencleankliegpoppyprapsskelfhelmsikatsmingetenonspeirbipeddoradskewsatokemigodaspertastecurchjumarricheaskedxystitanteepicscaretmommaletchmeousscarfenemasilosspectrhinehotispaysdcessetangithalecrowldonerteguapunkyderpykwirlpugilzoomyomminfeuarjemmyboughrontebraxygopakbungsalureteddyorantdenisdjinsnimbychikstairamoyasquaydoperywidthvinicloathrasedejidoloopycrithboggysizerpolisdosascodesyonnyphagedepthhijrahazlefurrysprayingotpyoidumrasbobasdienekoraspoenamunianattolorelsleetjannssowcedormyavianhyraxmailsbeigeaiyeemilchrametammoseloinpiingsweeraperypoeteputtiennuiwiftsrillsspragraggyclipssmizerosetartalsagerbolesknollpliesbremelytedouchtawnedburksrepunreatapalsamomieodalscagesadunclogiastureshallpiconpoukecrashshiurbarbeblinsgarisudyoghoufsogresgunnyadzesburfithegnnacresengiposeydingomiaowshtupbaggydricedeedsheadsroosaacockbrasszeerakantszinossabirdizzyqueanatimylovedalthoroanyamigosniesatonyaloudkogaldacesscorpkorusremanspivsmuterfeelytrantquoadmaggszingyspetscovinariasclothgowangyposuritecutchergonstourorlonsteilwackydowrymetretypicslungomulsojimecallsimpeltramsvulgoshouticingwhorlpekidspratcubitclaesscullsorerpaisesuentgarbomoldsarbasskedslitemsepalvoemavellssweepcuishsiethbatonvarnaetageithervuggsjodelhovedbelahbodesgauntcairdyobbyhawmskapowsteptjinnsauntypudgescapealibibutchmealspeponpalmylawsyfabbyamoleformereppsarishbrakeglaikflanewifeyhypesgleekbirisnonnypokedparveovatehazedzhuzhetherkidelaleckcaskypyricakseskiblavolaemezestakhtericavexesrageslosesgiltsmurlymaniaordiegrubskiasumalarbhutsbatiktousyspecsnailynettainnerlaithfundithrowplutecubestroneknoutsculsmetegfakieinsetkoranpaisacruorreaddshaulfrommbotehquarlflavadeochjehadmollobazasmerilnaieoanglelamiaagoodichedcornslotosankussweirsnobsswabsvetchquawkflirttrapoenurnoutrodearscrazenomiclubedgouchmvulazebuscullstoltswartspodosdewaxpeavykeemaassedemureconneauntsdurnssullsstroybrujoetuiserrorincuttachotoyermestosatedaideshandyinclefiendsiceshylesfandscostasowlsusurpsalatgestelomesdoltsagingaholddarreagilaswigsarmerbetonsenexpzazzaholecowerferalbiblesunnapowrefishosoftystyloswarfcogiegardethirlayinssupermadremaranyodhsadeptdaliscramsreinkhaithgeyansinhstoomslumbipukerhaledveenaturksahullluterargilergosassespattuhowffpactasitkasheepcreedfairydroobwriestolasfrizzmoharaitushistsjoltyroleoditzypoyntscrayminkebombomaconwaxergraverandspoulpunkidtassododdysimascissyprimyawkinsamekdunkssyliscutisrageraedesplaysscobeunhatgeepsleveloshacopalstrailyeastlinumthetegypsylianglakerpancebatedfouatwooedharosvitalrinksroerszulusmumpsnoahscoveysaicssaferroostflimsmurkssalvehoochtrabsbambiswissfazedpudsyodoomavensmitasgirlfnaifstikkarojaknighsbulkswinespinkyrumalaforewhatsgorispiumawhigsincaspaspygirlyphynxmundubrosykentsrunesvraicunbanbaltijockssparsmokerlegnohauntihramhoohatitrebooayrosalbasalboyosrazermarorkokamlensetskedduetssalpadrylygratsmuredachesassezjointtastywaheyironyzoppoplodsgoolypalkibudgejankythymypintscyanswarbstreyfresesphoohbuiltmawrslagarmaridgrebosparepietanoxalabasekinkyprisshacekvicarmarkatemseserirblazengakaheedsbelarqophsnotedbrewshaftsrattifirmacarbowrawladripmvulivoicifetorreckspernedowlsmuticfettswetlyexinekaurububbystopeharamherrydachasaicetheowawingfrugsswolnodiumpartigailydweltmoneylanedmurryskitsrowmetatoufrereukasedolcirhombtynescorernerdypeatsfonduokolecloseafoulswolescenatalaqpacessenasfaikspneusrubaijibbawouldpatlyfusedcrenadoleymescaechesseraitingesarangloutsoleitinnynoterupfulvenuenatchpaniccuriayompsdiodebinksstearbringpekaupeacehumpsixnaymauntbalotcosecpuraoarmedliarshifisdockswuxiaphooorusseguttyurenaaidasvialspossechaosadmenpilumgunkswowedinurntrugoskulktuteewrierpyxessoncetsuboflossalgidallennolosstossweambaspromuchosnebstalcspekeswaxenmarlsclavititinswinguncutentiahwylsvangasaynebasedknurrraiahpingsveganmoundmentaplowtgaidspipaldeetscaaedsayedhatesdebesmastsresusunarmchaysrownsbabuslapsealterbruinfurolloordswitsmajoefavesalbaslysissharkpeachvadesowletbrodslyamsratermovesmynasarrishiemsquagsroansreamytantiheadypirnscastsdressenewsamidokininaditspuffapucksshutsmuralmeredwhensgowlsdarerhelixmirlywomynraggswiljamonieneramnyamsslamsdirketehrsskenstavastablehoraloupasnavarhippyrawlydietssurgylysolsethspannyarumsmullsmazutdronyvirgarathalunetrowetdancydefatsplatrogernuchaploutmungssloanusquesakiaguidohissyjigottyrandrapytightpusesdrooppepladeterglebyprimohavespindarievezabralieusparkyfanumyoyosstytefaroshealdgasessamasscapatearygingelossyembedgenalburpsfitlymythypurgebaukskwinkbawtyferoxbazaralmahhainspeakyplopsnorisbrinkkirnssordoboomydufusnardsgaleacorpsspeildearyflybykerkyunliddrumsundoscoolscongedodospavispataspandstipispureestaturottebeadseverttealsvinedhambagopikcranswiledweedypachapargeperduvauntpequipiccyleanymarlywhiffneivehomierestsawareriadssomaslyttadorpsidyllmulshpencevatuszorilsemesargotdrouklinacclokenimbiangermojosbozoschoofavaleviewymazascanonabunesouthslobsmolershipssoulsbodedwaspynowlstricenisseteatscanedbinertronccuttytrussdiyasmersewaffskoalaagateezinenudesrigmoevhoeslickwadasolateoleicwoonstypeyoncergummasweetheavypsychkhyalcatesbrenssoclekatisfriskwithysaubaheyedrostifeudsnicedkylesrawnsgadjejabotcrisetacetlinesessesgropeswashngatiwisedgardalocksgelidhorstattassyconteliaalgalfraisfangoyetismarcsaddioanilsbuncewirragnarrludesglarycoxedbeakyylidsaddedpattavelescurieuncesledumsansaadustaureispitzlogieungetthemayowlscoifssurgesoftagyozaputasblaesblawscellybuttestampgrainbursaliggesagosshealatripemeerdegusstushkyndecuredpffttmillsminxytykesatmossuiteramismerkscoyautwatsbussumoothterfsfestsenmewnouldhooshnylonalefspikaszoonsbusksqapikremoucawedpallymuntuteughslimybassialmesoutgobattarankslanksroguyzippyfoidswelksrowanpsiasyowesallowrantsfakerdellsrumbotitircombiwindsrubbydeifyquenacrapejokeywootzwiteskosesnizamprattpukkafixesbobbyruffsmagotargalammasscoogaweelgiliapayertounsrupeemargecollepatesdolesrappelakhscarvegranawytesmacksnervemitrycripsbewigmelicandicbandsmugilquoinpoolsomiaidripsearedyippykexescarolloresbisesobiasthurltajesemmewchikoorbitjimmyvexerbegobaskosliwaaburgsdemobimbedlahalchatslavescohosjowarnurdyiodicwhosobrothsoopstriedcrinsjaunecoarbcocasmughosmokoscaupfeartsketshebesdoumskoratbrikisoarsoathsabeysbromeapprotarotlymesquichamenddoersdudedhushygrogscleikauditkutaiskyremilkypeenscoozerusksmeikoboostboozejeansneepskobosdazesbayesspimspegmamaddybwazixylicagatyrawdysoreedingeassamstoicnyaffrowedledespollsolivestrimtaraspinerstenoseemsnotumcripestoainsimabuyerglueypoohshoveajockykinasfangsyawedtungsephaspovosscramcamosympesspacynucinlooedambitstilepalayrochericesdiotagatchvastyotiumflorycruespetrisyceenippyludicsayidwelkelinksuptiecloneploattiynshumicatopybasanboneydrilloatenmucrosealscavilrimerodylsnakedmaqamkrengsardssimisgeoidbutohabomaoyerssheaslaichimineficusduckymobeyeaveswarezhiperlaundpunimjouksrouteroodswushumokosovensebonspathseidosgluteabiestilesunsewbidonteamsmuffsreavevigildutchjapesspeardulescanehlakinarnutfadostonusfliedsergerivesscornorbatalinegenrehiantquorlcreampebascoalaproddlampswrothshillpenalspineciteemildschoirbilatbettyculpadillyperfsmalikkondosurdssliceabletomasahanchvildefaynetensestaredisasdowdsbrazadooksvertsintromirahkarksnonespodallaidsdelisatmankarzydebarprionfaveldawenlarnscheepoiledmeerstattsoickshoundeditsgillswickyrokesgeitsyaffsxyloltopisblokejiberbrunthollyblipsparmorowdyaidersykermbirafifthpowerwaifsthetanudzharkedsuratflashoffedemptyfindsdemosrielsfewerjirgascalyprowskithemambupontsrectomysidushermogasjoulebractstotspwnedambosyamparalphdozercandyemicsjollocarvyaxmengritsinlaycadisanodeoculidervskanasdoingbikernorthpurinpakaysqueetumidyerbaunlitfogoscellsmauzycrucksaltsparmamarrawattsbajritakaswiverhaatsstalkgunasalatabaldswispyteilshabitgripepelesevitesophspermyskeeremydereduxcohenwomenhazanmerisstaphburanjoneshutchyuppyhoselgordomochasuitsmikedultrasipespinupdaubefilerreccoovalsloralfurorcounthoagyjoistlemelshwasmeltymommescaurgyniemambotwigsequidfoxiestonetrunkmbretbreysfarerhatedtitupsledsabbeyglampbludydiveyrhynemanedohiasbrailvistofullsgonadspradnoyauarohadargamottoventiurnedlivesniessnestsmecksyachtkibeiwrestboseybuzzygankslaughabunawheelkepisbegatsenessedanmonpeghuslgampscoostplumedopasanisestudehuhuskamikunsodaizlebeatsphylenyuseremixrewonglifthikeschirmparksbrookbitospushyerevspoundmorgysonlymogarhymenlugerrelitquranglostrefandarcystumpmelasneedslamasmisgoweensbunderatchmyopscreepalderkoapsmusicdruxymoonystetstigestrollfleckoutedabceebutylgoleswirrirowtsryotsbegadgipsyyevesspicescrawteersmirlsstoasclueskavaldrackflickjukesmatheriskyjacalmalvacloutweedsnatiskoinefluidfunnypenkslathedeoxysakismisalskivenichtstowngraspzuppaflatspadrehewervomercaromsternnoncefortetrimsroachbagsytoazespiksdarbsniceysigilbruskablerseelstyersshawnorigoresetmeccatubaspluotfatwaderroworldgesseminusguanonantigyralslebscommygainspotchtrypsseinetimesbomohoverttrashputerdecayiggedbuckubiotaportalusksskermglitzstayswhootlingsbalutburlyhoingdoganvacuisnirtnamedleavyscootoverseyriemaralronukvibestattyloxesgugasscutsikanstondofaenazhushelmennisusfablepasarratosjoustgalaxadatscamelglimswullstrystcreeskojisvareccuzescussorahuimeinystrumbellsreupsnabkspipiswaggaquayssoftstabesbareryelksgnawssmalmcheekocreabigaeremexmixergrundvughyforayshengringewestsdeferenfixelfinlysedcauldscrewmungycowaltrovevirgeoutenchowkalanegeyerlyrickhansmersknidortunedfraimmtepewinnssavingaugeplowspheselosenwiredpuersscreeruttyapneasyceskiltylivengalutpuhasrymmewaivepoodsbrochgoalsculmsnazeseldinscantmatinbiddysugartimedvarixshottnantswrootsylphpurgadebtstenetmoorydocosculexseptapilerjagasgnomeharnselverordoscribsenowstyresbolksmulchsabescapribinkyvantsskellfoalsyarfapiglynumbstragshonkyfistsunkedkeenskierslokumnemasekingshelffiferponcealbidreadymesnelumasneapsplatepimascobiamolosspewsvireschotakahalcinctbalkynebbysuerstelicaxinglyssafivermorsebilgeswithologypatchbelayleadyulmostuyerquothwearyplanccostsmalmybizzyrontsgryptsarirvisasodahsrearmcriassnoodpekincurdsvautsquaffcrawlsmashsabraagamibballbunnsfinerupdryouijavlogsrhymesmallimbarchasebeatyscrowchinedillscheersaulscarpskaikschidefaffsbesomcanidharmsrazaipitotpeeoyropeyagastaugespowisagogegagessinksmolysunionnawabguestkudoscrudyhearsbiledhantsjoursfleesemeuslevesbonesgloryskogsannumankercaukscoigngoonspaalsgorseraitatripytizzysprewruralrejasscotedeawsspiffshiedsemenexultbluetspamscloffheasttouzymirvsheelspingeanelestoutgerleborasporchdiwanswathdernsheezesoursskytenetasspeaktapesgobbebingycleatboyaunakastetesyarakfriseyraptbrineforgeknarsviridbumphpulessoggyshlubpurerfoxedatterrakesunpensainelipintagmaeyinghorksdronedesksdadahlusersickyplattlarumpuztaclearcraketrikeburrakotchtilerombreaerosleonemingyvasalhennahovergledsreistskirtunifylikestuansowrescooksparryhumphpozzyngramfeignmaulsgybedmutumouensminkssiteslochenervyhoaryhoutssoporsucregerbepardifetestokerdevontremsdwellunaptgolfsaureswaulsbagelprentcurnsbairnslubbhytheblocstwaysdoliachoomvawtevoltslimaxkulansangamiliapalesreevebolasfjordnexumminnytalusaloofwadedgustsbongscrookyewenbrinyarefypronkdriedwantybabultaalsnonnatwyerorvalcaffeglopstrinepadisexerthoxedruingrunosustergottaareasgennytripecedarreineetymascawsmbilavoidsendowcnidarakiacapexwielskellyhamelbasilwoadylapinlooeyquistclampurmanprollharemnannysanghtelesrodeslievetermshemesrepataxlesfinksnixedhoggsdaggysektscivetfayerprateapingholonlitretriffmoraekacksquillrottyspieldekkowhelphumpybarrokaurioflagtippyyarrsladdyvoarsimidsoglesrouthcigarroyalyummyolpaejiltsfedexducatarettzetasshchiyoungbiteylislesladetackstepeegusleogeesbobosobiitqanatbarfyphwatwriedgynosmograapsistongstsaditurfssayervoicecoguegradetoadyeosinchildvivosbalonjanesvaultcarnsgenuaeruvstellypoggefeazehenchhamalskawsrumbaelvenzoaeavisonflawnbatchfanesnuevoyirdsenvoyfoggyhermsshandycladmaraysautsawfultuxesascongoutycraalnemicafiontablachesskhakityeesjinksslivewaughloselkippavrouwpeansrokedredyethymecopraproinproresagumfeelstiresruskypremybreedpastysooksrobesayrieconuspapadshalmtyingruinsstedeporesmollecactinattytoeasfacetbrazehastysareegenompyneslususcenseyartomonthlacksfaredmabesfifishomasscaleversowimpycuppyhowbehaoleparasclanktrugsperryscurfpaseofubarmedinhawkstubedcanerbluermeedspreedpeelsharedqualmsyndssalmitowsedargsthanamarsevrouslengsyokelmzeessusestorsedaintdowsekroonbabkaawetonoirelustscredogeekyzanzastinkginzosotollistsmariajheelbaredbuffevinylzygalchainzillsgapossluffdaisyarborrishihidedsehrisagarhurlsoddlychipssickszanjaserksofferkreenagoralazzobightskipsbermsneralbaizastingjarlspromsmudifmujikpinedheledtushyshisotoquemungigorpspunkasinedbepatourielavaltyposgoofyyobbogumpsslaesclingfanonmirkyrayonzaidepryanackeefacialardytrapsscarprenigtaxestifosradditoingwakesdiaryemoveagitapostschapsspangyocksacmesfictawasessixmopucanwealdzacksearstgorbschossreaismoversythefatsorayedtarrerileyvivasglazevoltetosylpatedcliftwispsskeefcrapydurockohlssauceaggermoansamentmadgejawanfactypactsdivvyogmicstonksizeskeltypoovytwainstepsalmugmaumyvillsbugleinvarlezzyfirerlaevorapsouggedtreenlyresvichycotansoredtolesawolsterfetallycoperswellparchpilonfurlsapagepongoreirdkyloewellyfriteexamstympsscugsgippotitangorgewashibesesdevotbirksclewsyeuksrectatommytheekspreddrantzilchvaluemosksploitmungaapiolneskibeakstentymedicdomesductsrakeemochyerbiaaguedalphanowedangasmuscaresodscendvasesdoseswanesvotedycondkhirstanksokrugtechsmensegraffsootepilowcuspscholoclubsscusespeanchinkurnalrabiccheebtramplycrapuggyuvularigorshadycomasbancolockybelgasabrekokasnerdsseracraminoranstirthdollsjougsticedwanlymoldycordskineslightketolclautiambsrojiscropsjurorphonogoobypleshtozierenewshashcoppywordyfiggybitchplexibakereevenevadeplaurmondoqueuenoobsratoodovesmauvyprahuphizzkulakagrumdyingunwetmairetupekgormsjiffscoachzibetlocisboolsdictsspoorgaupschacodiddyalangarakssegosgadsodunamzurfspreemhoiksdynosaumilbailehavelquipulassiarobacheetsociareboplovescoaptodistcobbyabuseracedruthsounceeignedenimdoonadukunshrednanosjaggsrohunmuseebestsfreedcetesjerksfyrdsbaloosilextamedcarlethecacairnsilenbuniaproulfuzedcoalynubiarurushennylevasalikecangswokenaggrowortsmucidgrevewhorenotamconnsrubesmaimspilusgonnaheedyblookdeevepursekitketulpaisledilealbashohottysudornutsogokescourbupjetendedbiogsrefixmolesaurarpupilsoupsliarddogeymasureanedthumpflittshoerrostsgobboshinsplierzuzimatollscougwailsstatemistyeevnsadozejurelwackosyedskistszestyexfildupesapersdoppeyagerjuntoadowncarteproxyyaudsdukedsonarpomosgrisetiefscedisbasonoglerdonutdotalsyrenmutisfenisflukequadssheetcameoperaipryerraveytrankdecylvardayarracombybeleekoffstomosjittycusumpoltssculkpeweeeclatlandesebumnechespalegrownlogincapulweirsslormpoxesseameduelskubieshrewalcidpengomoperpedesgeleerunicshardmurescurerlabelrauliswalywentsampulbraesrinsebhajipiquiancleollersensupumpyriyaltoadssquawbezesrobintereswhereveilszoccomountgaursprosysniffzazenfungiremetnamescriedspinyileumscubaazymsbantytubalyaarschicaritzyaptlyloupeabnetcobbserickyinceshedsdebaggirthesrogmimispuukowhiptmazacshivamalistouksdemangussyupdosfixedervilmihisperpsretiewilcoarylsmawedbrughpompahyoiddoolsinionjakestawafnoemehireskoorisoaksulemapseudraithfilkspudgyimshiweemsmakerthreejuteswinedteethphylanoriealamojeelsboredluckssadosyacksguyedgruntosmiczoppawartybritthaulspuslekiakifratemottsodourbudedclotspioysmazertaboshaufscakeybiffsbungyriggsmaulapieceairednappymazedboutuopenswhalepreysbileshysonboxenunwedmaukanightwagespurrscorespalasdelphfairerhonemowasprobsdemotmargapetitimbueweestaboonmaaresenseswimssammyjingorekeybulkywantayouthglosspootsthudspercemenilureicvenducuveepoposbuttssyruphaemsramalbaryealceajaggycursispuedyogeedavitfacietoneshackswitanhokislowanpahusgoldyunboxdowtscopsesnuckhaarsbellonebekslipttokeshewghalosebuckspaipssewarmieuxmadalahintplishnudgytuqueinanegalasneeldurdeeamylskeyedlaccyslideadoonkaughnaicevampstwierglebebormskrunkbuazeimarisepadvertugiantreposcourdresinflubsunbidfeltydecafrazoohibaspoutsklikseyrasfogeyaleempapeyfiersmotettulipsteekscaffqueentangoreputroriemonasponksderosvenalpipedalapsfittsbeseefauldmoleyapodscircsplookasylawaitewoundladduticesbleystuffekainskundsseedsalalamawnsneddymengsewhowdoucstoolswackskypesbunjybraidspifswyledcholiquintpantoclowncokeysyvercothsyokulvogueoldenvardovibedciresfondsadawsamusesisalphonekwaaibruhsruntywonkspsoasaloweknowsazidoraikesideysadestaredculchpotedafootkerelkakisdevosmetolavizesaidskiltspunascopalprialangrysootyslanequestgoopyploredubbyhimbodogalappaldorrscandorewankagoscloopadaysguletporteclepthaiksmiyasyeardmiftyoaterlinermanosrowershuraquirljafasclackpikelmenadflukyreansenatematesabraythanskuyassongyincoggaudshokumdogmablendarecadirgesargeryijylatusgambeshackrenalreuseslishpaganstirpkyliecalifhandskirksdocusuveasshapsgonzomummythawtactinhoardhowlsbundtblushsupescrogsseronsolvecherttottyabornvinhoagreesnushdanksproudraconshalypagedpulseshankonsetspainregexureasorlopmushycronklatchblivehondsgamayheatharnispurautofushindsmewedcowksbirlsgoyimstendalantnollefulthtasarluvvydiveslungesnickderthcoseydisciuncosyukostansymetalbardesaucysmearfrorekneelgramacrioschedienduebaftsrallismoretenorpawnslodgeresolcarontiarepooveundamkohasvapesrivercaffsblahsvaporbrachretaxmollsbeanskempycericscodydittyporthtartefaqirjagraogivebezelmalaetapisacryldullytravecladsrhimeskirrsnootprowksataiembuscolzaafflydashybuganwahayshenthodjavallidaubyoracybeanocormshukoucornilaxesnoisyshtumcannyouterflafffuelssieurrehabgleetdiscomammyaevumhipedmoorsagleyebenecoadyreruntyndefetwagarbatroyskapaicalixditesmentsprausloofstrothaborerimaeearlycarrssaletmiensjoeysquirtembarcokedleirscozeyflaskbenisguisepatsykirribravaridgejotasreapsvarustwitsfreakchadsplaudoskinoiranmanksadopttriollogandecosglamssadhecirlsthemesiverquatsmbubedrolemhorrgarbsquytekellsmitchadageozekivrilsmohosleepsskivyplapscliedsaithsaigaswainklutzvaranahinglouseclinkpeeryburkescoldkunasforzesyboepagodwiccainfosguimpkailsevilshosedvanedcharrmurasmatzodraffrangebuffoalistepochroralyuckocrackfiletpouffbiggyfestamoylerameebajanmargsgoredcophadangsbardomicashireevegiebeersaaliiyoghsnavelhearefeasejorumexemeuppednepitcoversmackponeypreifcaulsgecksburkadatesbonceruffylayerarbahmirkntrainenactfremddravefeareerectswealpringbattstheesnudgeantasdovedpelshpigmymuiryflorabonneopingnauchpawawgollymuirsminaeagloofakedjamonbownesoulyfunsyclarowhidshubbaflongsnathhoweslomasquassaboilnabisshakoshoospookshugertotesglialatigimirthloansfaginphphtchinatoterfleekboccehengesunisnentabookymilessteezpionsrapinwolvepopupunodegympsstanenaidspleasorgiadamesabjadpeecelurgifrillgitchfeuedlowpsstongpriceholedeavedhumasderedswagsimidehydelannustronsmoppyrellobentsbubaldinlokiwisurinenamerfeensidlerlanesscrogmasedhiderruffefakeyzarispertssatyrsupedganchtibiacededrabbistunsstoopabysmauliccarpemostesignssteakmixespanirgridssaddychodeviolagiguexeroxmiridmanorstrutcuretbonzewinksmortsgealsamlasstubskembosubahdaledhellsapresliferjhilskerrygaussdayalfilmskophssuedeunlapvalidwayedmechspicothalvafuniczexespitasnondowaddylobarrowththrewefitsnosirillerdobeskabartoffsrehemreignlentihucksknockloveylantsskiesgroufsmutsriftsmauveretrotikiachompnazarclonkregetovoidsechsmukimkyarsamazevalorwoaldfisksgibercamesroundleesepubicbarbsissuerazormythskranzbaapspoxedvadasjowlstwillfritanaiadurealguslalipidsojasnempthuerspulerwhoopobiedlithodebuspanaxbefogkilignitescarexlogicswagefratiedictdalleiliadbootsscourbacontaressexermashamonalpappiflumeabordchivyparolneonsmuckoeventyaponfuskssowndfrowspaxeswhaurskeanowinggiletcoopsabbedonlayakeeszouksbiersmoonikafirlysinxviiirusasreedsyohaysalonhonesurupasmirsshirrmeteragrinpavedlipasenskytrustgippyenjoyappuyfitnamoueswaxeskoiwilungibunchgoierfrapekeirshertznairupromosunuprefisscudoolentbromosooleconchtepidmengeaughtyecchburnsbogiecarpiaretebrakynaledbonedtalongoniaderayceresinkerrangapangareuneslomotremaycledhedernarcoquakemixiebellegenrohurtysmekegossemorukfuseeepactpeevepramssevenpoopsscrumobolichirlawaittweerexiesnokesolliefonlyteelsngegelallscascosiglabriertootspoofymichejawedroastdigitgnowspeaseboguereamsyuftspligsupledgrycejesusbionteastsshadsumiaksmaikironsoozedboxerbentocepesetapetorahdarkyclamsalfasguidsciboladdercragslawinmothslucreraspydielsslurbpooeysprigdoverspodetasertazzaundugrakhikindspashadirtschottolpeswidowspeksdianegorassentssalislodeshudnayorpspontysnotsfuffsouedsstintconkysocascrwthwalesstaffbigotthensockerplashkamismaxeddeawyzhomotaxedhohedmodalauxinnyungblagsbaulkflypepeschmondetowerdeitytiftsshornthackmawlayawnyhaereonersmuidsalumyducesbaccysampsgantsblinymonosknavekickysahibkesarhatergolemchurlboletchurnlambsvuggynotesgawksborerbankyamissorielnevvysanerconteuncoybillsmoraycablemucinmedleblotstwirlkenchlineyditchombusllamamansoloopshoughtomennookykraftsalepkavashoogosairsboxlapennamaillfunisconedbotosiliumoktasbumpyreifsbevordeltsgheeshokesseersyuansbasersordsfundygubbasantsweirdmangopoalotectabedyemurregobbysuavepraamdeevsphotymodesapeakretamwauksoncusfayedlawerfichusquibemergsadichumorplutyemmetyexeswadisfractverrerevueenolsridesyapoksidhauptakvariariftyknarlplavsunledwafersaughtroozstalecadieragedegadszaydestockkorosryalsnondajessylayindopesyarkslugesashedpyxisondoldatalfootsreliebravechanapoemspeazedumpyheresaccasrunupsurlyolonaglaceputzabesithokeydunchaineegleanepenazollecleepsynthwhetsbigosagueyjeonscardsristsetnasbarryluxesroninsnarswholechalkliltskeevewanedipponredugloipecottalimnspersepsoracliptjirrechitimautskonksfeerspirrisandszappyrepelrositputidgalesjobessouselookyjeeravergeseppoboffsvacuabanjoayontaegismusesgaultboeufshownshulspolerknoudpaedoekdambouksspoofguyseouselnewerbilalmoledboltslettyrionecoatsaahedsteelsteinbirrsvapedhovestaxistianspalluwipescleckmirrsvalisimpotmalesachedwrokeportspulkslaceyillthtitarbiosegadidhonksplombpurosgyrosrhymybialigreatpeatysizaracetaclemscuddysithechelpgerahmysiebesatsagasnakfazarfscobzafixitpochomaunddaltsstartreoilfiordgotchdoledlintslifesnurtsstainvillacuratdiactoribipouiswuffsleggonivelnarodnamusmunjamanulfundothawsplanecocosoumaskhedadryersellsjugalrazedannalpealsdumkyshiokyappsmacedunlegqueernachouplitcaterpinonquantridictaupemihastorussavoysodasrealosialsgaddiarseyandroareddpoakablastorcindirtytwineloinstestyinustgaterraxedsloydriantlitaiacidymudgetypedstylisokolhangspsoaeladooglimeserresaunatahrslooiecellakaurypyrexvespapavieclawsneatofitchemailemceekeboblogesintisfanoswarnsbawdybelchcroneamaroskidspyuffsprodlutedshuleloticdooleplecksneadmakosrainemaronjeffsmowedyauldevensprivyprunodaddydowarakkergulpsummahraphekasmedomedmeejaflorecitalglensbrawlgliffadmanpyraltollsiviesveuvemanieknurlgammeternscuffoinkedsabedpaipepaletquirepowincillsfussygoonyyitesalcesyogincalkstawieroupyserifboogyfrabsknagsalwaymonerchimetappashogsgroneomegakisangestseolidbaffyzamboabahthadalligneorachreplahuiesranisspaldstumsstagsgodlyslackfezesbriespekeanatalgulfsbintsnoshiwhitemeantkightrekedmousypawasokrasspankglobysauntkyudoridgyvicesshovespicsspiryjestsprogswarrerubelfootyflagsagriaskyfsladedflotastageaspennaresyulankajalungotfretscurvyskofslurksjapanpintowineyarrasopsinkembslunasatriaflowysituptepaskatasboysyhowkshitchjeelypredydoricliverreffoporinfleercoblesibiafecesresatprofsgrodyscagshelloimmewfatalrubansonsequeemfiresbotesflegsquinosasinhiplyberkspinchchirkpawkymallsfistymainsbaldylitergenielobusarvalmumbovodoubowetriceyeppiecornyfateduterogoosybelvebreamummasjacetdemurcharaturfystacktogasmardshongitoisekaphacrarecadgebeefsgroszmeuseumbermotedtittyhightlemeswheftsmoutfurrsyevengledealvarbaikspantscapizunethstomanimpsrennefazessextssayondochtnowtypilesfueroclompuntievisedpynedhorahtragutillywaursmornaexitengonirepaymesasmieveleansuhurulindslemanstarnmulctsoledanvilgirosnullssonicsweatomlahrivasstallcircalynchcarapcloyepouchdoffswoodypommequiffhoerslatedwangsnealspornorangsmeatsclachpeevoroarymisostownoviewswidessodicatomygrikenapedsacretrumppilinpudordicksfetalzaidarumpspukedhilchlepidmaumsgastswroteheparcoureoareroghamrefryshewnblubsrozitiodidchookaidosslowseironkeyertimertweakvitasvarasshubasemisgrampocherscartdoabsreglehurtsmustssingereggopavinstunkpeekssusedrubiopiperbridepuncefealsdwarfnitreeightgriptdexesaltosbeauxbundutatesfoolsrandylocusdianablingfarcylibelamowtstawstutessootstrendbenetsocessnackcielsbrastdottykneeswristborgoofternagescolicbundswaidesuckspithsbomorthunkquotadwamsmilksfemmenamadbicesbothyoximsacerbstropinnitdichttylerspicaoctliborneuptereducelabiaformshakasagazehillslimmacultibelowtyptoblimphalwachaapcavesvideofakircoedsarrozdoxedsneedhespsbuffagarnidulceperdyrigidretagmesicciviltrueddicespeonykiorezikrsbidedaskoiundidhommedrailduplydidieearnscockyhoperkedgyconesleuchpervycarobreifyrosintombosubharufusyukedpanelmundslianeprolesheelaloedaruheinaptmethsarenegenetswaysbadamchutslikedsplayavisopainsroricshopsgauzyusetatruerduanspirrsfrushpontobasishakesmangioxinegreekdumbobradsdurryfoilsclastladenupendaunesscansunpotnaggycaumsblorepipuldratspoyoustraksoylesaterlyartpumasrakuswaledmoanamoilsnookssixernappaflopsworkyloadstruthgraaloceanfnarrgliashooksmungopacaybranesawahpootylappapelusdappystrigbenchravesmiveyflaketharswareszonerretemslotsscopemooseimplyebenahathidermatannapeizecrurahogohmealymuttsaminowoofspoopytrodssniperaiasbowsecodedraredclopsdatossukisicilytesteroarsinarmmorphrummyfowlsgessoturmeyeukyundertoitytwiteabayashaktsevakdawnschicsteheealeyekitedsnodstanastorosfaressoukspaprimongsdamaridealflitsfrontspumycantokokumrenksauchteggarabakapaiksjuncojubashomeypediscrepybiroshalsejagirtikasharshimmixrillehordebowathaylecholapareoswollhansadeffounpegabeammalmscabaldittomurrasteenduskydukasouphsdoitssposogrovyionicwomancivicunaryheaveomdascollspursynoulebittenabobvigiayolpssnoremulseelopehurstmarilfatlyrantyshtikfemiclininpithyflitezincsnounsyalesnegustalksreekyascotokapilenisdowlemorasdusksfamesgravsrewednievetautytotedbrandammonicheskipsysatayboozymurghdweebimpisrottolerpsmollaquartrookysheercalvesafescoochsekospohedstorkpottooleosyaassaddlepiedsmaedisophyholmeresuelaganscrubpolksbedelverbaquipscoonsmezzobousyhexylcrushmahwaunfixnavalimagyroneschufaactedhurdsmimicmerelscuffflyinossiamacerfikedbalsapalusyirrsshuntmouchsawedcladegaitsdustycarbschokemuttiwontsgwinebrahstenchjucosgraftmasuschecksheareyrirtwinsboganshushmerchcastewisessibyloakerarsismelosregmameloetalaslearyaglusderigfoodyjuliasappyjarulapplescarsagenejollsgaucystillfondapaddoholesgruesagunashakakrumpcometplankspellcetylkaonsjelabciststolarlimeddryaspizernabamsuckyuntinunseeblattpurdyslatsheughheardforexabramracertintoreviescopalurexjunkybottsspoolydredottaradulttheftloumastedscantigurnshumanlemmegreysmacleteazeroblecidesgoshtejectquopsenurenougshestspenseraserreekscaresbuggymoaisplantshoalemacsposolvenomemptsbinitwoopscrepetroiswithsexpelsorusmutonkibesthousalloyquarkyedesfrothkazooruchycercitruckspeshexingdesseimshysharenmolimeloncarermonicceibawhupstestssynchorbedpagesethosacoldaredeowledsibbshomeraegerpoetspowltdainetaxorneezesaserflakytachseffervapidmoolamussygaspsparcsrebidthirdexurbpipesvinewwhimstemesworryepeneyelmsscoreneafetempttommespueswoxenrooksmattscebidclepeleperkhafsveldtstoupversacheatsainsbarreestersockoamidehivervoulunoddyloachnidedbefityeansloafskieveuddersnyeskerneargantaxonclozetynedschifbalerkvellcryptkarnsleccykentefuddyblasealimspokitnoemafascifishydreysnewedlupinriperhausenikabsederreechsokenbattydeicemutchstivyboongphonsviperlargonosesfentsredubpowndcezvebavinskoshkyriemusedunrigwamesetensdeilsgrebeprimspansyusurecaidstusksskortmitisrukhsshieldhikrflememeismarithshitetaubekievssmorghongsgaylysewelpurreknotsvagusboultacaisannasthilkfeastguyotaxonsnemnshizensatinscoopsitchtapasabengrimedreneyquoteunsexpettomabanarpasplunkgeatsagmaswildswhitskindyprieftrawlmeowsstraeaiyohdobrodinesdeucelatenidlisclarythotszoomsleadsgetasemendmeldspreonbanakfomesunjamcultsekkasbonnysudsystiltyagnarouespitsurepeghobbyalmaskadismostounputpikedalandterairikkacrewseerierocksbimasrindsgavelglebawiggakolasadorbhairyrougyswiledobbystoatsnedsribesravinrammyleucovadgeicticdriftbuhrskrabsbollsvlastloxedpagrimangywhipswhompboxtyomovsfriarpungymaniccertybodgytuinaflourdenesoxiesmahisarsongeansdaursgluedboartgroupchubshootsaleakweizedupernexinfuggybubuslaresfivesfoulsamidsallanloursgeniibirdsmapesginksjiaospatengrrlsslovetytheroomypaeonquitewasmsaggripriedvandaraynenelisbuxommuggyexierjembeooidsgullyramensubersutrapreakdrerebowelhedgydelesrefertoftsmiltyfroshmanasoctankerfsenormrebelguaconiseipelmanasisgoethoaredsegaraflowskimswitedsoughhokkupardyteemsmichideckstwonkfalesideasdirlssniveclowsleseswakaswahoomemiceniacsexorkimbooasesdermspulkasutorbotchunausvughsrestokimetmalwariotyenemyruderahentyokershmoegramelyticpottyodismacinimulessolerantaeloundnickybragsdoeksulnasdaggacadrecoypucottsgalislowesbezzyskraniliacpaseshalvefleshrunerweftsrebbeisnaesirocgulesclombamautnewtsladlegibestaggyhaplykalpabilksblownyomimattapeductinganlinosgooeyfibromaisengomaadzedflawytoranjadesoffaltwiltwagerboobykobanyulesironeazygytrykesweysneistnunksrogueriatomulaiobeahemulemocosgirnssortacookycausaayelpmittaemotepelauthangappuimomusasitytauntdammeulziesuidscymesmuzzyanataspyreroateboppykeleppilafcaverpheerderatpeepstaniamurvasureryatrakapurudonscoatethelfrobbochyndnoupsbrizetexesboskyaarghalertshewslirotloftyjollypaleageodesuetypongaforesvoilabeechcuminpolypmuridlaufsalarmtyrosrageeberryytostweltstinctcackssnuffecigspleinrededdivedkestsmuckygraysberthadoreraksiwhiftpirksrovensyncsnomadmedalcergegruffmachorootyyabbylintydelftdawahresowblinksaltysowfflweistuftsgiponvealetigonjumpscrickpacosporaedoterrewaxdoofssarusvalesdousechekagorescrusywealspausecourskakasnixerscrancumecmeteswifieeleetheartcostedupedaloindragsnounyvacasriffslocosbottycatchburntbelliswacktholestimyholostapetrectifastsmustykeechmoulthellatendsrugasreedespyalblitzoctadfieryusingrobotunsawlipesmethygivedfacestousebikiestulmpallatoledwhiesherlswritekanatperchshirkroofyskepsbeamyrullyswopshaunshorsegiustminissizedzizitcrumphulashaikavervemoochvelumtechyfoudsmantymesalalkieroonscaposgrumpnooitafancpacksmoresambryrugalparlyalifsleggewawlsnadirtennyernedsoldeyerkseaglyabeerreplygybescabrevifdavividgyverpsoaipacaspiumsemitstoutsjotunregalsheenteslaunmixgracepeasysohurganjapylonsentegumbogrueltantyedilerhumbtildeslyerlastscarrykaifslechebunksmoatswoosemistsnihilbuffycabbysarodquoysseredlividattarcraigchavemacroblechsteikumiaqdoneeyonksnopaltellsglutsbdaysflicsmetaseagrespoonhogospinolfezzydoodyalaaprugaeupseychymeraileurbiaboothmangapreenhilumluffsbaitsravenpreuxgauzegaledpungihedgeheirsreiveinduewytedtorskfuffyfilmycarksneosalowndquakyloftsheminvodunparedkawedgurlyhorasgellyfoyleshawmfaineulcerpodexariotkraystownyfragshumidmintssiftsmererinermexudeselvaaspiscinqsyogicauriszestsbazooagiosrotalbinalsellaastirwackeowlersaickkylincoxaezokorvyingameertakenyestshavermuggaaxiomprimipikauscoutnearssozinpoolyropedsezeslavaspilistabislazarsmotefeylyjaperinrosgriotalurkduvetsepoyrustscursehahaskervekyakslongadegumdautsungumwaldshollofortyhowfsnazisenlitgilpyodeonwhealflobsforbylumenoptedneebsgagedsulfatoyonclousapartmerdesukhsabmhorheidbumfscogonlarksparkirotosmovieninessambosaintfungosnafualkosstaunagrosbawkstakhisnellbanksinletrumenshapepeskybaccowarstdukestyppsjauksnapohnitonkhulapresetranqgazesmajostuismbaccalassoaskewanighheapssagesbrisekaimstikesbulgegemmatafiaannatcaskstaxolnittymiterriqqscecumavantsmursstrayyestyboylyskaterangydosededifygrideburdsagonecoxaldjinnfadgeabeleskailapeektoonsspaespayorlegitgapestakincuitsaisleamicicerocwarmssoldispawsnaansdolorarnasimagemoulyaxelscodecfaffyslopypeppylaarioligopriorlupuscharerindyprotohaickleashxystsmuftidandyoxterfrieshylicmusseadvtsmustafaradontalabovepuntonicadcoirsknospmirossamfudoggooilermowiemirzafecalrouetyikesjortsdenayfullaliartsojusajupayumpslimosgapedmiggshaintmicosweidsroridlogosmopeyaxledprovelapjerampsoxlippetalaphisfauchgoodschiaolazedopahstitchlentocahowhutiamochiatlasjoltspratsomeesnipasdaniodhotiventsallelloureersesdumkasalopzantedoumaagushgirshscyesapismceazedictamiffsbladyfeebstyiynarearruotechewybonksstogsfuzilsuhuroxeyeswampproyncopedgrapetichyaartirudasinbyemopsytascaamigaglandbeepsmetisbogeyglattnuttydearnranseauralsleekactontaleaovinesaistrivetleaptwiperalumsskimoskimprousedelaygazalapptsblertcajunanionsoxesflipstipsycuspytraysamateyenteictalacoeltumpyscrimscumsboingroilscoffsshilytronktoursbrooddumascokesdictuthinkteendhaughkenaflousywreakmaquiradiopasmogrensskintmnemelikerbukosciscoclangcycadmichtdesexnaevisaluebingeabaskcageroralsfryerphotogrinsnurrsmeilsgillyproramockygrewstozedbriefhonanbanalungoddreadchebaravelzerkssondemofosnettyclotecockscalyxceriaracesstiedoorieglanszonedestromasascapotokingnugaechichcomusarvostatarperlespacefolkyhalfsproemvolkecrewebachsfigosarrowdrapssaheblotesshayspareudellamamakdexystutordsoborispsghestpenniduddyfuckszebraflowslavrayborehollaboosepupalplagefifedroofsdriesmentooctetcohogpoppaprierantisceilsleezemolueyangsgizmorousttargaeprisdicotsteempingostolehoppyrealswheeknimbswhopslorryskullmudirwedelheftealapakikoilorisjamesdoylydawedboxeddicertogedclintprutadholsurarimindseyassrobugmotifdurrsfylesboastblessjarksitchyjhalaliersrulerradardekedpawerropeslakeshasteaiolitarnshuffyceilitinesexactmooeytheinsarisurarepaterinboxexistblatsrymerephorgrufematchcrayscornuplotzhawselivedformakaluaboobsfehmesitaruprancivvyredoxparpspubesplingseguevintsnooneoavesleakytubbyfardslunarleatsflorstowelgemothablereameyeggsstenttasedbruvsmotzaacralgouracoleyruledchethwalkspunganixesgownsstairsapanfouerpisteoctalpoofscamasbalesclumprittsvastsmazettypalparrsswadssandyishespawkskelimturonstripprookpakullaborfaceytragishotesexesspeatscowpdentepludsladeeplaitwhoofrigolringyprosechuteblebsshimsramsemuistpiskyledgysoldogulpyspoomginchskyertabbylapisatonemyoidacheylopesmarkswhydamaxisriataaeciasharnlambymoseysijossirenpeposclootbammymethiqueynhattyfinalgypesdwamykaamaplenaberobcunnycoinsdialstriercruftpewitmoxiechilllogoihadesdwalepaskacaddygatesgadgyaliasdolosmoloiactusaccrabaurslasesearlssmootfartsdolcemyrrhabrimmaxeslithsnipetogeedsafednoserfecksmasutworthdroptsiledglowyyourspulussinusbandydagostotalsmaltbahtslehrsralescullyfilchfeinttilthorbicmantssoneslacerindowspadeseccoareredawgsyokedsaimsskobechowsparkastirstsadefannytongasighsjuicyjokestubesshootmakeefrondsherdbuftynoviokiloshostsvailsdecoyjeepscallepennefarsecapedbonerkutasyexedbayeduralihicksailedarmetmerleclodsnannaboyfspackybacksbemassaredmorrospartopiumbooedfugiehazerumbosdonnaarticmoanyquoukdazerparleprobyalodspilaofraudjacksmowershifttroposolidhintsdobiesullymuleynestywelktenterpalakboetigrantchicoleastlesboweeisroulsreatevacuoswatsadhanpelonobitsspealserumehingkadaiplumybarksregnahempystirkprodsflaksfemurmenuscabinsangstenuekefirdhowskipahkronehuzzawojusredostragapapaspomesreakspluffwimpsdareskevelriventreyssmirrpixesgalahnmolsdrusysassymyopezerdaluxerfratstalpatoothbosiebecapoastsninerawmryhartssiegeslojdcolbyfrittgemmycartsaburnagamyleeryblackstimelythefumedpokeychewsfailsfogieminarsabzijockochibaavinemadlyserinerasedulsegustolibercopsyhemalgladytopesphutuembowdeathparevnoseygiverfloatsonnydiceybyrespullyslashcorkygaramzupascupidgrosslillsluteapoyasficheratedsalestikismajatbeckenebelerugotownsrisescaperfeyedweldspearsnonanunplypattynubbybevvymagmadoozytoneyyaweyzezesrastacloudkiangsimulkugelkiackjongskadesswornpunkspietskehuatophesistsflintwyndspurrygourdshaftkussooximenixiestormunbedmikvaskeetdebugrolesbrushooyahstilbwardskustijibbslubesalignbortyburqajitisbeamsnadasfessedesisrangiwaderglyphyardsloosegoolsschavduliasabinwrungaldolkhudstholibipodzaidyjubesslurstweelzoeasadobociggymottymanetmigmanoilycurvekokerpotinyaddaniguabortslawkscrimszitisclovedikedwaxedrotonnaatsspeldmaikoexpatjewedxebecnoduspouleduingagleefeardpragscryertryerambansitedtorotsteaddrakechemsabortregartarokcimexiiwiswaqfspyrosselescymarvistamadidmixisgarumscupsvolesswiftbaniacaecabosomeeversklimtawedtrodemayanbreemyucchthiefbounsrecalmoltomoiracleekkonbubamasoasalfjeldposespotooelchismartdovenguirooubitmazakspaysrialselogeoxmanstymepiaisnullykumiswittybroadryuginertzpotesyettsfetedwooersolahumpedfrorydrainworstbustsickercaurifelidwhiskbuistzippoursonroumsunlawluxedpulmospitsquorkroresjesseadytafrostbawnsboxesshiesfudgyauricqadisdreeswhortcarsejuvierattysegnishameelvesmoarscasermaltybovidsarkytwixtquickunripyoicktonksneteslownerakkitwiceyerdsbiglyylikesquegmaerlmixedunowndrankdukkatonnekybosemmyshotelmokkywannacurrybengaogamspagneowerssuredhavocviralsassehankswinosbloopsireefraysfritzchivssexedtoricdrunkebonyfixiekvassatmashaggsrompsmeepscompoindexmoststhorpchawkunciazobusfarcisaultreingpiraitacesdodgekirbyzygonpipetepoptsheroboomspumieberylrawertabacmilorvendssolaspoilutahasanimazizelheighpollyrejigqiblahormereefshotlypositsypeddogestepalrotornunkygustyspunkchielsazespshuthorisprankgroansamanhashyvixenniqabjuralpacedunzipdoyenmikralaharsaddosulphdrabsgetupreseeunfitmittsrunceskiffwynnsslypetopazottoskithsrecueshrisspootbastizamiapivosreccycoilsanuragytesquiesparmsreikimuddymevedlandsvoipsbusedkeenoliensgirtsclerkstupenacheassetpiyutsurestrialbiggsroidsembaysowmssowthjewiemousedoglyhavansowlebramealcosabideickleballobooairhodydetoxpeakemoltsaeonsglaredholejeezeseizelottodallybammafrumpspeltjatismottemiaulabjuddaffswingyhappimirrlplumbtroattrompusensresawafalddurraflametwireroutsuplaygyeldconicgulabwakedstucscowryseitybedesgrizegoetybannsstemsmutedmayormartsmoalstarryclartmornsdisksutilebenjisobasmanehbibeskookyiftarnibbylarvatopekminimjomostutusbyrlsmetelziffsincelrundskurismeidsresitaguesopzitwraptkitabpluckwoldsjeatsspikyfalajzooidferlygangschardcuriodorkslanchterreemmerrivelcrozepavasvilerhanapactoraleftpondymafiapuppazymescoreysurfysixtefroomclasplionsscraekokrausualpockskattierredalewssennajohnspeolavauteunicafaughtreesgloatkheerdebityowzastarknailsrunchhatchquinefluestoitsricermohrsfuralecashmommyrohaninwitfelondikasfrownnaibsbirsyclonschaisbokespadriloneraidoiolehstirospyinssushitimidanimikransserravehmeprososemiedimboapoopacherbalksposergaudyraitslabdasdaynsleergoodotantosixthagogoowsenpanksaksedroupsenokidemoiawdlsnavewvenastwaesspurttradytresssaxestainttunasaightarameswivesuintrimondrinkleachsedgywhilkziramkrangyearsboloshuggyjakerzincybreidomensfoxesupsetwadtsbeinggroutnodalgranooyamahootyherbscooeekulfimobeeaddraalackfuguenoosesajoupeysegenoaosarsupbyeaquaecagedsalalimlisondespassulollyvealybleedabyesployestakenyuzeweighcombememosorlesacnedvoilewikisstondtosesshoesbocksaesirzymicpresapiseswefteaxoideejiticersbleepruddyclypemoongtheseditaltondiemongradiicoofsquaircavieskeezdimergroomsepiccanstpacerbiccybieldburaspriesrestygnapiwooshgaspycoyedticcaintilvliesxerustaberhajjicargotopedreactvajrafulwamillequitsatokspianigeumsglintmaudsdaffytriacthongfairsreddsgunkysmilecomptopepevoddyjagerfinesplongnotchhandiangloskegsreguradornpeepemoilesectswrangporalmolvisenvyseiseaudiogathsgonchbrantblimycooerrotastollyvulnssnowssneckkiddyverryswirlrottamateytumorforgosloomlouryrotchdohyoprinklerednoxeslifeynantorahedstudskhayavairesinewgadesnablaeasedharpsfreitaromaservourbanairthdumbshulkyazotenaeveranidblaffpenisdimlysailsrewthopsitdivnamumsyiradeodeumslavefeedslebenstarrvagallaybyhosesrheumwokerdorjerodedklapsdebbyelanspornyglentfoodssankorabatbufosbuppydorbapampadewaryanksknutsfightcomtepanchfrithpeersfoynebaledhoyascheaplomedbacnesamfizookswinkygryderooseweenyscoffminertorescoledmezzanutsyhykestiterbywaypiceynaioshurlyleresentryhansekraalkorisvengeabbasgynnybeirapalpihankytrildhoiedbubasrevowspicyphishwizesdiffstergaohingperkybriskstrawnancerucksjoledcalosniftygravycabochunchphobedopedkashatrapemoakyyipesvauchdortylibrahullybustybappuopposbodhigibelrondomochstapenyodleranedangstoasismimesdrawspinaxgrisymobedcresssewanutterblartjambufunkytufassothsradixthaimadobebrumeskearveilysleptharpynidalfribstyredguggllobedorzospiersscalddeckogironsimarhewedvicuscasasmaarspriusfactoalategonysredippipasmakisubityclatsbatoscherespudssangolarkytolylsorbileerspulasluachparidwengestavebuffitallsdollymarlemawpsguanalyceagoatylairydrupepiculfuzzypastsdoseharledvegosyowedkarezdorbswainssulkssoralbreadmitieineptplugslaksasofasbrikscacasdonahtominshakecronypapesmeshybrutebhunamunjskurrefleasuncapmotesannansiredelectamasscreakjamunhosenportyyonisrosedloamybibismaccapaintdeismaiyoocageysnashcurnyshamamalaitassematerfarmsdrestruiceduettbirseinuretomozfinedwiderkenosdrusepoddysillychawsgivenusurydevascainsfreetlushymetifbrerssauvesykesaortasindssouctpicalfloodfaggypahitstookfarlsmayeddirerchankpetosnoirskabobplungnaiksstaderezesfuselbancsmolierodnydippylassuhellyporkytelaegermspuntymixtetherebeerylungsborekpygaldozedjaupsyechytawaslayupwingedingsclueytastoairnsditasmiffygenusfetidchurreggedvitaebriarsiresmesadwhinesoapysemasbulsecuttoproalsegolliwassoldshydraaroidpsalmsadisdinkydrugsbakenagentbetesoiletvathapulednullotithedildoswansdahisplutowaftsvulvafurthclaptzaxesmamastintydreckgulchbuttyheiautypespairsortetgarthagalspitsomebbeflairgoofslaikskarasamitygawsymoggylordysambaaloneeatinmusetpokertrinsgristpaveristleplaidgroatblondbortzgalopasidecalpaaugurlimesyrivdquailmongopagleyechsunwitabackpilotacidsewkedberayprianrypinfolicpliedokiesgushybandawormsdivispakkimuxescuddacongadinedtiffsmoxastercethinedouargemeldrekspedaltowaithigstaitsmoratnappenoviawembssmazetalikoncetpecksprunyblaysdwaalluausurgermannaxenonspagsbiterbuntysinkyotaryeukedapaysscalaostianastyoopsydaudsbegetharrymeathvoxeljellyhotchstiescremerulesdobrakloofunmadpodusyowsaaiyahfolialowryacedyalecsprowlpruneeludexylemlummenisinrubletulpsyoposduitslulusneckstapirlezzoleazeevegsbumpsoddergripspronefugalhullomorneowieslobbyyarnsteadesmirkyandycusksjurespsyoprhinokanjitraikareicbutlespinaletupkhetsloessmasonorpinureidnurlssuonabingonamakbassyhaspslinkymolarhoghswallscommatitasmachetracecrinecolesspardhokedeiselpooayriderhaldialgastempiabseyanchofetasgojisclevelohantaskssedeschangpikulroinsvaticreastcattyrafeelaikasoumswhissmayaspeplekyackpujahpercsnexallochyfordoboyeycrumbglumsdemitwanlequateaminsstuffbootyspookshoolsluitmanoaantarkaratnallachimpfrowybuoyskissyfurosteniazlotyblearkotowsweedoinksmidgyunsubgolpeladesgraphminoragbascelomwandsgonifgrimembugadozenclunkfirthkurusmeanefennyjaspegoldslatexdiazobrashahighpinotpioyeswipeflexibuatspambysaluthumusoleylkohendeemspadoucolinleprayorgarokeyoncesweetscaputpilaeyentaanconbellyripenraakepalistreedboygsslartscuzztennoaggiekookspettiweeksaidedhyposimagoamebapagerawardscutecippiasdicbrinsmesonsunnypyotsbabbydittsspaulpatelchingloamsstyednanteslipegresewythehelesnummyketchhoastchumpdixieidlesvodkafermimaizeaimedazonskammemoitsexeemgoralmelchshucktalukpawlsgajosghautguilegleysjukusgluonmanlywaltyyikedcorbyzairecharyarrahdroogsubbyragdepondsoseysgrassgurdyaixesmarmacrimpgassybronccooptglibstomandimpsvaidslikenblowyswareprintyourtunitetadahcoriawhamoteenegormyurvasizzatgyanssyensfidosstraprebarchileriferurasehingsmajorrabidtauononticgarmsbombefirnigermytunnybabootullerendubruleoidiadorseapiandabbajumbyzobosakojamatedwaneymaaedfrankflutedryadjupongyalsrurpslovatextolsheolwrateafizzseptsbredechemovieuxsoresnoxastrocknertsmistolocalyournklongmissasukukpeinecabasvardyisseiboricalephhuskyhovenaieryapseswharfaddasassayplastsuccitalesdatumulmineusolgriefprongwhapsvocalvowernidesrebusbrowsscathscabsrozesbluntadbotmyonsrallyeyersfillefristzimbsaymagleeksjudasflirspruntinorbfykeddictochilispiallisksearthsconebemudtosastribedayntcohabpreopowareatiltshrowglasspavvyravedmindiochrepoleydeaveumpieranchclairfugusbunnytarpsdoomyrexesvroomlauanastermeetsblinipavanstullflimpmirkssholapasseskartgazartrefateindwiddydinosclinetokedcubictouchsteyslazossameychinorajahlyceepopiashawssatesotherduchymooveorcaspointbeausvigorscaudgirlsgigasfollyrumpygaolsmotissauchsaludpentsvozhdobboshokaskombibokehlaicsnamazslainteetsforcephiesgenicinvertachiargusprickusersbluffhecksbewdysildsvivatknowebesawmuonsnoilsbuikskraitgreendookyyeedsgingskalischugssorasbuyinsilksserermercsarseslimbomoufscartavenincrudostoitcynicrhabdkaphsarsednooisflierylkesfiriethowlvirtutulessilvatrestkrillhourilezesinfrahondaansaenicolunkeystimstraptabbotpelchgreedfaultjolieaxialestocmislsnormapleepmoirekudzugooseflamygayalgambaurpedsybilgoxeswivesmurukoftenwelshpostebisomwalietuberdourareerdbaonsrubinrelictowzytineaaftervolvaeggerdungyshonehaugozittyyummocaupsmargolanastindsfabboblancquiltpekoenapaschaftfiquemillysigmashmekrumlyumbraovaryfoleynitidnyongogledtewedbyteslitieaugercimarseizatampsbruittoughkopekalgaeriojadeareplipsrheasprootlologdenethamesdrubssauteswoonfogletidaldealshaleragletsegassericneifsdyneloldiefeoffustadhancepixienetopraupokeetsfustybikedburoomozespaolophocadykeyksarsrejondinksegmasnitalkilnsmalashopakpacaikreeflunchkilpslosedetweetennetextawenchpectsmazeysporkhathacotesponcywhileozonebantusalolremitlippycocusurbexpurlssaetalinchplocklevisslantmurtifadesfoundhakambusesgoggafouetsilkybighabegemleasespirebindssampipyresnewelbaghsrudisniefsdonnehowtoyuckyummeddomalessaynujollimbablainkbarsboetslottadikeraloesfelchaggrykutusamucksmeikhernswitchyairdprysemunchfinosmolasdoleeruborzonaeboyednovaskhethfudgewodgeaflapguylearepahaultstobsfaxedcentoavailusnicsongsakelafiererougeyuponlanaimiskyspakefilesyouserowndshoonprillspatsjudostexascodonamainmakiekhojadibbshalmsshawlhermafiarsruggyslugsbleahaiverzardaordermonaddongsvatosbirzealleriringmuhlysheafflueyhopesselahhebenagidilimpsaliyatugraneeleyoopstrogstersedelveshonkplicachogsmgalscabersrslydonashuffstwangputtyposhocombsmarvymynahrebutporgypommydhobiylideneatsvaletspaillagerdrookcestapestyhaikufermsrykedartisvinesslingtractpenducorbezayinbimahshitslegalpadmaklugegurusplagacasesjefeshamzatacandreedregotmaseseaverecolehiredastunskatttethscitesxylylstabsdepotminossheikgreinarabateffstrigolyasedemesmobieasurarowieduneshilsaspallloonslacedoundyroseswongipakualiefslehuaajiestabidnollsgrypedeansnagarleakshadjiawnerbabasrockyfundsbonzaskiedesilevillebegarlathizlotezimbighaziforbsmalkytosedgingaebookflammsienssemeedaikospatepechswowsekhadiseanspownsbirchmixenfilumvygiewringmollylefteschwagnashpujasvillicobotforthgookygorayurgeschopsfreesgildsblockpoukspokallullscuprokopjeincurchibsgoersnullaharksgobbirediflobeshiltscagotgamesbeastsnaremalaxjukedmucornarrereinsdiochkhaphknifescindporerratespillsrazeelezzaspermnajibyaupsbaisaxenicbomastorsiwearsskrikyolkspetarclayspeniekapokdivansteepgibusranasairtsyealmsnaryorfulfuranthioldemonsistacavusstuckskitelarntwhackmewlslibrihoyleinspotangsaudadbroomfeodscrudsarcosnirlyyelpsplyeryokanspaitlitespuppyvigaspudicmassaligandadlaratuspeelyhotteregosteachwillygappypyetsnyssacroupwhaupaitchopticdirksoakedleafsoffieputtshookaquerndintselsindoocerimusvibexaudaxvimenfonesrithepridedadisguiltyagestocosquimssnogsfytteleavesmokycorkspeggypornsgloomdurosdyershailydickydorsabusbypoyseboofyartelkaputswamythosemouldmilerkaiakballsmoreehyperoozeshipespastacwtchriledrompusclimsodomadhocpittubreerherosagavekoloswaulkreelsyawlsmormomaidsbonumfortsvierscrynefrackdeistsowedmattyharlsowchesolosrobedscudslilacsprueclourulvaswoweehoxesscowsscandglaumtweepjaxiepahosgallsboreeblentcalidclamewaverheistsieldmuliecannaptypeolderflaregayernkosilenespotrommkaykoansluredluriddroitbarfikalesomersganevdaychtroakparvobuenavinalovistmatzaloggywuseslarfsmezzetargeshereascuskrautislesstangcampitwoereverystupaitemspuyaspookazoneskumysyogisshowsbineslaudejellsmelesthorotardscolonrecteradifochesgyvedmebossumacbedimfouleumbletwistforzaabeatconiabasaspelasphangantracuntstrulyyitierubusbiviamookswantshonorkuiaspyranjauntocticclagstawtsmossyclapsmarchtimpsboweslidosbantzmintycoseswechtlureswawessoppybetedperlssaboscylixwieldozzierasasgrowlderryfoistuprunrebeckydstprangfinnytiltsmaubygawcypoupeshogidazedcaudatrassjulepflogsparsebravitaigsamensbakesrewetrepinterneadeemsudanmassygleamprudeduffstopoiadredamiasmorahpervedeinkmeleejinnijiggycidednoustnoonsramshmessygurshnurtzdrowsmoseskamesferescantsrootspubbyshishchitspodiahallswicksafretcakedartsyonmunnashivisorictuswerosunpinpeghsruedaloobybirdofumettonerchockdrearbettarykesamongsloopdivosshirsmingshooeyrondeepodepeneddiebsarmorcomfybylawslabsinnedmohelzamisallisfacersetupyogasserfshillyatomsteadsboundprooflibreflushknelladdaxkanaldoobstuttynongsbarranaraspesoschasmkappabelietrillhauldngaiofrailpukeygromaswillfakesrodeoamniosmockscoupwebbypolkamurthpressseelddikeypestskeelsduredjiverplacemiraaskodyshoedmanatahurusylvasatemlootsfeyerbuffsgeesereddykemptdubbovowedsinescombobludsdoviemomosducticoitssulkyfancystuntcoastmarrijamboethneclaimmaluslamedcobradedalrefitinniebratssprogsokestaboocalmsmooednalasannexbrainmushagazerbitesliegelawedmarmsromeoshakyarchiwellschackchocotroopjerkysaverzombiborelrusmaponeslazzibladsroakeblitshavengauchcowedsorbscanoeeughshoganulyieverdeduarslirasfaddyyeeeknormsormersnoephoursrenaybeigyhirerwhishaheapramonpecansongovatjeponorboilstuathrekesloupsgreceploukmucusbetelvalseplimswatercleftbesetgambspyatspangsjartarajesvoterscaryyoresyagisdavengeestrazesfrasscoziescionsalixslierroteslepakpiendslatylummypeonskanaedampymaseracharsmellputinbursttainsjavasbeefydzhoslargegulfyteuchgonkscivesrealmfrogsbeathbasentatusdaristaelspowsymazarnomassweelwifedcamansiltybluesflumpgummioopeddinarskelpducksgearegoingsalvosoucechapewincemudimaimakguideunridbobolphotaoctylvireopalarneperjuratpraosmagusblumedeledhoorsroperoutiemazeschaffstoryhexesmemespauxisessayucksdownafoliorecaplivordhutifauvepoojagigotlavedwrylystoepreardorguenotalequalswungnerolnomencruelskaldmastylowthrecurtigerjaffabritsdidisvaguebullawhirlmageslicetiridspoortseyenlaristiredcarnedoiltomrahbasesskunksnapsknitselintslopebudisarretsedgealgumzilaspaahoroshiflytelamerbajuspurpsemberninthbakraamniapatinoozieabohmveldswetasaconejustschouxsorelrossoscenebarictrattareaecutupnowaydoggyshivschirtsoundozenaavowskarstfrockcruvebluedsmoorkernsknulehoistkarriswartosierboffohookymashyroganselkyouchesallyokaysjokerfaithjaleoganofcoldsanimepervopulliplebetackydemicmoenibaffssnookcellopuresvinerdropsgrillxeniaendewjookslemedkoresblurbcommsjerrysadzaagaspalmehmavinelidegaumyfarrodorkynefiegluersmowthuntsqualemakanrowenwhareripestohospekanaglowjobedbermefinchhayeyfaunsmavierumorpileacurrsyeuchoxidefrancgeltsshanssewerslubsmyalsresewcraickeefspairebantskrubiludoslinenlardslinnscoxesdebudawokenyingdowfstraitydradjuttywoozybulgyflamssnoopmizestorsobearsauloiprepsmanzosaystgleiscomixdrawncavelglobihaudsmoodsjakeyhafizdevilemeryclavecinchspiesroulecomaeswankeikonsizelnitrytaverstovekcalsmincerusesberetzoistgerestoppymucicdrivegodsoflaysnumpspowiekittyervenmokesdaricsurahdummybroostodeakoelsmaleorospsleveeblabssamesskrootunicthighmaybeboraxspewydewanmeakspaweddeltabludeslilyeructduppygaujegenaefilthfusilreadsburseduomostylewunganeembmekkathillvenusgransbayastheedfanksbastotripsnarcsfuglepatiomummswithedsomopuredtautsbadgecroakloaveargolyohahlingojedistetrasorrafleysbassodamnatiledareadmohuatalkyroisthyinghaomablistrapidferiadurasraneetwocsfaintquarefloesroomspropsmirchscarebourgwiserethalpileibirlepiertwawashyggealarybawdstupiktillslaggyhapuscoombargonsextomeynttrickgamicsarksneemsrovermoulsaxmandeairspillabuzznagordowpscusecsoapsnazirbushyjumbomameeticalsooeysorbolurersinsifrigsudalsyurtaplumspunchbookspestasleysmoopssavestalerchickmugosampedbarpsmuzakdotesklettpretayampysmickseresloveetelcocrostgoferquabsbransmyomamodusguildchamsflaxyrailsmickyrohusstemewormydoulaframeloonyfearseupadbitoupippytankypurtyshulnmiteymilfscitedhalfaconksstounmontesolumferryseriabilgyviredsienthinaukalamamirsmarasstipewhowsebbetzorsejottypandaswearpoonsdeidspatusearntbitsyjeteethrawbroolfroespulikdidsttawnybeetsganefsuttavisnacafeskippsbeinscomesaptedcozesichorglitsoniondayanleishveinyslokadoutssteedfluedayrescreeldeensmozosweepyapacesoolswamediciercoccimusosamblesubakdykespittaubacsmoolymahuajarpsardormahoeboutssposamucksgowdskyatshunksshaveknapsfouthshowdcanalcertsquesogrykeindrisikascozedmamiepukaskeepsspokeazanstaffyclifftamesaulosensuepilawstottlaitylabnecollyficinfucuspousypodgerightswiestwirktweetlolasspelkbleesyodeladmixporeyvevesmoobswuddyneeseraadsadnexiviedstompwonkypulpystungericstitissquitbickynirlsholeychantpubiscutieembogminedapaidwendsumphsmontyunclemumusstensromanbreisniternovaerivaljumpygameyrickslimitnigrehairsunwonlinuxsowarsapidebbednewlyjnanaburrsdinerbunjebasicroukslouismardycommeintertretsatapsslatehetesbaguawhumpadsumabledsidedwryerulamakebarsportstarytrowsloricfreerdipsoshutebrissbuntsrillyursaepereakytheinputrapeefettarepenlammyvealsactascytonfaurdsmaaksybowstopsnanasdoolyghostbumbomicrobroilleantacmicoutbyskyrsyrentboatybrownajivabathehakimreflymencemiresmafictreksmotorsnigsschmopedospermsodumssewinhappyghatsroqueduntsbennebirthmurrigadisfirkshoarsqueteretinslagsshirtgoneftokenoboeshonedmerdsnoggsthawymitrebahutharesjoleskelpytriadpochemocapswamitockyfemalgoarywaacsdunnydecalfungscadgyjalap";
+const WORDSET=new Set();for(let i=0;i<WORDBLOB.length;i+=5)WORDSET.add(WORDBLOB.substr(i,5));
+
+/* ============================================================
+   GAME 1 — WORDLE
+   ============================================================ */
+function Wordle(root, board){
+  const ANSWERS=['CRANE','GHOST'];
+  const answer=ANSWERS[board];
+  const ROWS=6, COLS=5;
+  let guesses=[], cur='', done=false;
+
+  const banner=el('div','banner','Guess the 5-letter word.');
+  const grid=el('div','wgrid');
+  const rows=[];
+  for(let r=0;r<ROWS;r++){
+    const row=el('div','wrow'); const cells=[];
+    for(let c=0;c<COLS;c++){ const cell=el('div','wcell'); row.appendChild(cell); cells.push(cell); }
+    grid.appendChild(row); rows.push(cells);
+  }
+  const kbd=buildKbd();
+  const again=el('button','wagain','\u25B6 PLAY AGAIN'); again.style.display='none';
+  again.onclick=()=>loadBoard(currentBoard);
+  root.append(banner, grid, kbd, again);
+
+  function render(){
+    const keyState={};
+    for(let r=0;r<ROWS;r++){
+      const submitted = r<guesses.length;
+      const g = submitted ? guesses[r] : (r===guesses.length ? cur : '');
+      const mark = submitted ? score(g,answer) : null;
+      for(let c=0;c<COLS;c++){
+        const cell=rows[r][c]; cell.className='wcell';
+        cell.textContent = g[c]||'';
+        if(submitted){
+          cell.classList.add(mark[c]);
+          const L=g[c], rank={correct:3,present:2,absent:1};
+          if(!keyState[L] || rank[mark[c]]>rank[keyState[L]]) keyState[L]=mark[c];
+        } else if(g[c]) cell.classList.add('filled');
+      }
+    }
+    kbd.querySelectorAll('.key[data-l]').forEach(k=>{
+      k.classList.remove('correct','present','absent');
+      const st=keyState[k.dataset.l]; if(st) k.classList.add(st);
+    });
+  }
+  function shake(){
+    const rowEl = grid.children[Math.min(guesses.length,ROWS-1)];
+    rowEl.classList.remove('shake'); void rowEl.offsetWidth; rowEl.classList.add('shake');
+  }
+  function flash(m){ const o=banner.textContent, oc=banner.className; banner.textContent=m;
+    setTimeout(()=>{ if(banner.textContent===m){ banner.textContent=o; banner.className=oc; } },1000); }
+
+  function submit(){
+    if(done) return;
+    if(cur.length<COLS){ flash('Not enough letters'); shake(); return; }
+    if(!WORDSET.has(cur.toLowerCase())){ flash('Not a valid word'); shake(); return; }
+    guesses.push(cur);
+    const win = cur===answer; cur=''; render();
+    if(win){ banner.textContent='ACCESS GRANTED \u2713'; banner.classList.add('win'); done=true; markDone('wordle'); again.style.display='block'; }
+    else if(guesses.length>=ROWS){ banner.textContent='LOCKED OUT \u2014 word was '+answer; done=true; again.style.display='block'; }
+  }
+  function type(L){ if(done) return; if(cur.length<COLS){ cur+=L; render(); } }
+  function back(){ if(done) return; cur=cur.slice(0,-1); render(); }
+
+  function buildKbd(){
+    const wrap=el('div','kbd');
+    const layout=['QWERTYUIOP','ASDFGHJKL','ZXCVBNM'];
+    layout.forEach((line,i)=>{
+      const row=el('div','krow');
+      if(i===2){ const e=el('button','key wide','ENTER'); e.onclick=submit; row.appendChild(e); }
+      line.split('').forEach(L=>{ const k=el('button','key',L); k.dataset.l=L; k.onclick=()=>type(L); row.appendChild(k); });
+      if(i===2){ const b=el('button','key wide','DEL'); b.onclick=back; row.appendChild(b); }
+      wrap.appendChild(row);
+    });
+    return wrap;
+  }
+  render();
+  return { key(e){
+    if(e.key==='Enter') submit();
+    else if(e.key==='Backspace') back();
+    else if(/^[a-zA-Z]$/.test(e.key)) type(e.key.toUpperCase());
+  }};
+}
+function score(guess, answer){
+  const res=Array(5).fill('absent'); const cnt={};
+  for(const ch of answer) cnt[ch]=(cnt[ch]||0)+1;
+  for(let i=0;i<5;i++) if(guess[i]===answer[i]){ res[i]='correct'; cnt[guess[i]]--; }
+  for(let i=0;i<5;i++) if(res[i]!=='correct' && cnt[guess[i]]>0){ res[i]='present'; cnt[guess[i]]--; }
+  return res;
+}
+
+/* ============================================================
+   GAME 2 — CROSSWORD
+   ============================================================ */
+const CLUES = {
+  HEART:'It beats in your chest', EMBER:'Smoldering coal', ABUSE:'Mistreatment',
+  RESIN:'Sticky pine product', TREND:'The latest fad',
+  CARD:'Poker piece or birthday sender', AREA:'Region; square footage',
+  RENT:"Landlord's monthly due", DATE:'Dinner outing or calendar day',
+};
+const XBOARDS = [
+  [['H','E','A','R','T'],['E','M','B','E','R'],['A','B','U','S','E'],['R','E','S','I','N'],['T','R','E','N','D']],
+  [['C','A','R','D'],['A','R','E','A'],['R','E','N','T'],['D','A','T','E']],
+];
+function Crossword(root, board){
+  const sol = XBOARDS[board];
+  const R=sol.length, C=sol[0].length;
+  const user = sol.map(row=>row.map(ch=> ch==='#'?'#':''));
+  let sel={r:0,c:0}, dir='across', done=false;
+
+  // numbering
+  const num = sol.map(row=>row.map(()=>0));
+  let n=1; const across=[], down=[];
+  for(let r=0;r<R;r++)for(let c=0;c<C;c++){
+    if(sol[r][c]==='#') continue;
+    const startA = (c===0||sol[r][c-1]==='#') && (c+1<C && sol[r][c+1]!=='#');
+    const startD = (r===0||sol[r-1][c]==='#') && (r+1<R && sol[r+1][c]!=='#');
+    if(startA||startD){ num[r][c]=n;
+      if(startA) across.push({n, r, c, word:wordAt(r,c,'across')});
+      if(startD) down.push({n, r, c, word:wordAt(r,c,'down')});
+      n++;
+    }
+  }
+  function wordAt(r,c,d){ let w=''; while(r<R&&c<C&&sol[r][c]!=='#'){ w+=sol[r][c]; if(d==='across')c++; else r++; } return w; }
+
+  const banner=el('div','banner','Click a cell, type to fill.');
+  const wrap=el('div','xwrap');
+  const gridEl=el('div','xgrid'); gridEl.style.gridTemplateColumns=`repeat(${C},44px)`;
+  const inputs=sol.map(row=>row.map(()=>null));
+  for(let r=0;r<R;r++)for(let c=0;c<C;c++){
+    const cell=el('div','xcell');
+    if(sol[r][c]==='#'){ cell.classList.add('block'); gridEl.appendChild(cell); continue; }
+    if(num[r][c]) cell.appendChild(el('div','xnum',String(num[r][c])));
+    const inp=document.createElement('input'); inp.maxLength=1; inp.readOnly=true;
+    inp.addEventListener('mousedown',(ev)=>{ ev.preventDefault();
+      if(sel.r===r&&sel.c===c) dir=(dir==='across'?'down':'across');
+      sel={r,c}; paint();
+    });
+    cell.appendChild(inp); inputs[r][c]=inp; gridEl.appendChild(cell);
+  }
+  wrap.appendChild(gridEl);
+
+  const cluesBox=el('div','clues');
+  cluesBox.appendChild(el('h5','','ACROSS'));
+  across.forEach(a=>{ const d=el('div','cl'); d.innerHTML=`<b>${a.n}</b> ${CLUES[a.word]||a.word}`; d.onclick=()=>{sel={r:a.r,c:a.c};dir='across';paint();}; cluesBox.appendChild(d); });
+  cluesBox.appendChild(el('h5','','DOWN'));
+  down.forEach(a=>{ const d=el('div','cl'); d.innerHTML=`<b>${a.n}</b> ${CLUES[a.word]||a.word}`; d.onclick=()=>{sel={r:a.r,c:a.c};dir='down';paint();}; cluesBox.appendChild(d); });
+  wrap.appendChild(cluesBox);
+  root.append(banner, wrap);
+
+  function inWord(r,c){
+    if(sol[r][c]==='#') return false;
+    if(dir==='across') return r===sel.r && sameRun(r,c,sel.c,'across');
+    return c===sel.c && sameRun(r,c,sel.r,'down');
+  }
+  function sameRun(r,c,selpos,d){
+    // both cells belong to the same uninterrupted run
+    if(d==='across'){ let a=Math.min(c,selpos), b=Math.max(c,selpos); for(let x=a;x<=b;x++) if(sol[r][x]==='#') return false; return true; }
+    let a=Math.min(r,selpos), b=Math.max(r,selpos); for(let y=a;y<=b;y++) if(sol[y][c]==='#') return false; return true;
+  }
+  function paint(){
+    for(let r=0;r<R;r++)for(let c=0;c<C;c++){
+      const inp=inputs[r][c]; if(!inp) continue;
+      const cell=inp.parentElement;
+      cell.classList.remove('sel','line','ok');
+      if(inWord(r,c)) cell.classList.add('line');
+      if(r===sel.r&&c===sel.c) cell.classList.add('sel');
+      if(done && user[r][c]===sol[r][c]) cell.classList.add('ok');
+    }
+    if(inputs[sel.r]&&inputs[sel.r][sel.c]) inputs[sel.r][sel.c].focus({preventScroll:true});
+  }
+  function advance(dr,dc){
+    let r=sel.r+dr, c=sel.c+dc;
+    while(r>=0&&r<R&&c>=0&&c<C){ if(sol[r][c]!=='#'){ sel={r,c}; break; } r+=dr; c+=dc; }
+    paint();
+  }
+  function place(L){
+    if(sol[sel.r][sel.c]==='#') return;
+    user[sel.r][sel.c]=L; inputs[sel.r][sel.c].value=L;
+    if(dir==='across') advance(0,1); else advance(1,0);
+    check();
+  }
+  function erase(){
+    if(user[sel.r][sel.c]) { user[sel.r][sel.c]=''; inputs[sel.r][sel.c].value=''; }
+    else { if(dir==='across') advance(0,-1); else advance(-1,0); user[sel.r][sel.c]=''; inputs[sel.r][sel.c].value=''; }
+    check();
+  }
+  function check(){
+    for(let r=0;r<R;r++)for(let c=0;c<C;c++)
+      if(sol[r][c]!=='#' && user[r][c]!==sol[r][c]) return;
+    done=true; banner.textContent='GRID COMPLETE ✓'; banner.classList.add('win'); markDone('crossword'); paint();
+  }
+  paint();
+  return { key(e){
+    if(/^[a-zA-Z]$/.test(e.key)){ e.preventDefault(); if(!done) place(e.key.toUpperCase()); }
+    else if(e.key==='Backspace'){ e.preventDefault(); if(!done) erase(); }
+    else if(e.key==='ArrowRight'){ e.preventDefault(); dir='across'; advance(0,1); }
+    else if(e.key==='ArrowLeft'){ e.preventDefault(); dir='across'; advance(0,-1); }
+    else if(e.key==='ArrowDown'){ e.preventDefault(); dir='down'; advance(1,0); }
+    else if(e.key==='ArrowUp'){ e.preventDefault(); dir='down'; advance(-1,0); }
+    else if(e.key===' '){ e.preventDefault(); dir=(dir==='across'?'down':'across'); paint(); }
+  }};
+}
+
+/* ============================================================
+   GAME 3 — PIPE HACK  (rotate tiles to connect IN -> OUT)
+   ============================================================ */
+// dir index: 0=N 1=E 2=S 3=W ; opposite = (d+2)%4
+const BASE = { straight:[0,2], elbow:[0,1], tee:[0,1,2], cross:[0,1,2,3], end:[0] };
+function dirsOf(type,rot){ return BASE[type].map(d=>(d+rot)%4); }
+const OFF = { 0:[-1,0], 1:[0,1], 2:[1,0], 3:[0,-1] };
+
+const PIPE_BOARDS = [
+  { R:4, C:4, src:[0,0], tgt:[3,3],
+    path:{ '0,0':'end','0,1':'straight','0,2':'straight','0,3':'elbow','1,3':'straight','2,3':'straight','3,3':'end' } },
+  { R:4, C:4, src:[0,0], tgt:[3,3],
+    path:{ '0,0':'end','1,0':'elbow','1,1':'straight','1,2':'straight','1,3':'elbow','2,3':'straight','3,3':'end' } },
+];
+function Pipes(root, board){
+  const B = PIPE_BOARDS[board];
+  const R=B.R, C=B.C; const rnd=t=>Math.floor(Math.random()*t);
+  const decoys=['straight','elbow','tee'];
+  const grid=[];
+  for(let r=0;r<R;r++){ grid[r]=[]; for(let c=0;c<C;c++){
+    const key=r+','+c; const type = B.path[key] || decoys[rnd(decoys.length)];
+    grid[r][c] = { type, rot: rnd(4) };
+  }}
+
+  const banner=el('div','banner','Rotate pipes to link IN ▸ OUT.');
+  const gEl=el('div','pgrid'); gEl.style.gridTemplateColumns=`repeat(${C},64px)`;
+  const tiles=[];
+  for(let r=0;r<R;r++){ tiles[r]=[]; for(let c=0;c<C;c++){
+    const t=el('div','ptile');
+    if(r===B.src[0]&&c===B.src[1]){ t.classList.add('src'); t.appendChild(el('div','tag','IN')); }
+    if(r===B.tgt[0]&&c===B.tgt[1]){ t.classList.add('tgt'); t.appendChild(el('div','tag','OUT')); }
+    t.onclick=()=>{ grid[r][c].rot=(grid[r][c].rot+1)%4; render(); };
+    gEl.appendChild(t); tiles[r][c]=t;
+  }}
+  root.append(banner, gEl, el('div','phelp','CLICK a pipe to rotate it 90°'));
+
+  function connectedSet(){
+    // BFS from source through matching connectors
+    const seen=new Set(); const q=[B.src.join(',')]; seen.add(q[0]);
+    while(q.length){
+      const [r,c]=q.shift().split(',').map(Number);
+      for(const d of dirsOf(grid[r][c].type, grid[r][c].rot)){
+        const [dr,dc]=OFF[d]; const nr=r+dr, nc=c+dc;
+        if(nr<0||nr>=R||nc<0||nc>=C) continue;
+        const key=nr+','+nc; if(seen.has(key)) continue;
+        if(dirsOf(grid[nr][nc].type,grid[nr][nc].rot).includes((d+2)%4)){ seen.add(key); q.push(key); }
+      }
+    }
+    return seen;
+  }
+  function render(){
+    const conn=connectedSet();
+    const solved = conn.has(B.tgt.join(','));
+    for(let r=0;r<R;r++)for(let c=0;c<C;c++){
+      const on = conn.has(r+','+c);
+      tiles[r][c].querySelector('svg')?.remove();
+      tiles[r][c].insertAdjacentHTML('beforeend', pipeSVG(dirsOf(grid[r][c].type,grid[r][c].rot), on));
+    }
+    if(solved && !banner.classList.contains('win')){
+      banner.textContent='CIRCUIT REROUTED ✓'; banner.classList.add('win'); markDone('pipes');
+    } else if(!solved){
+      banner.textContent='Rotate pipes to link IN ▸ OUT.'; banner.classList.remove('win');
+    }
+  }
+  render();
+  return {}; // mouse-only game
+}
+function pipeSVG(dirs, on){
+  const col = on ? '#7dffb0' : '#4f8f9f';
+  const glow = on ? 'filter="drop-shadow(0 0 3px #3fe08a)"' : '';
+  const pts={0:[50,4],1:[96,50],2:[50,96],3:[4,50]};
+  let lines='';
+  dirs.forEach(d=>{ lines+=`<line x1="50" y1="50" x2="${pts[d][0]}" y2="${pts[d][1]}" stroke="${col}" stroke-width="12" stroke-linecap="round"/>`; });
+  return `<svg viewBox="0 0 100 100" ${glow}>${lines}<circle cx="50" cy="50" r="8" fill="${col}"/></svg>`;
+}
+
+/* ---------------- tiny DOM helper ---------------- */
+function el(tag, cls, txt){ const e=document.createElement(tag); if(cls)e.className=cls; if(txt!=null)e.textContent=txt; return e; }
+</script>
+</body>
+</html>
