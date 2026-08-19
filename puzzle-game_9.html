@@ -217,6 +217,82 @@
   #pause button{ font-family:inherit; font-size:12px; letter-spacing:2px; padding:9px 18px; margin:0 5px; cursor:pointer;
     background:#22302a; color:#eafff2; border:1px solid var(--crt-fg); border-radius:4px; }
   #pause button:hover{ background:var(--crt-dim); }
+
+  /* ---------- HELL BREACH (secret DOOM level) ---------- */
+  #doomhud{
+    position:absolute; left:0; right:0; bottom:0; display:none; z-index:8;
+    justify-content:center; gap:26px; padding:8px 0 10px;
+    background:linear-gradient(rgba(0,0,0,0), rgba(30,4,2,.88) 45%);
+    border-top:2px solid #6b1a10; pointer-events:none;
+  }
+  #doomhud.on{ display:flex; }
+  #doomhud .dstat{ text-align:center; min-width:92px; }
+  #doomhud .dstat b{
+    display:block; font-size:30px; line-height:1; color:#ff6a3a;
+    text-shadow:0 0 10px rgba(255,80,30,.65), 0 2px 0 #2a0603;
+  }
+  #doomhud .dstat b.low{ color:#ff2a1a; animation:dpulse .6s steps(2) infinite; }
+  #doomhud .dstat span{ font-size:10px; letter-spacing:3px; color:#c99a7a; }
+  @keyframes dpulse{ 0%{opacity:1} 50%{opacity:.35} 100%{opacity:1} }
+  #doomflash{
+    position:absolute; inset:0; z-index:7; pointer-events:none; opacity:0;
+    background:radial-gradient(circle at 50% 55%, rgba(190,20,10,.15), rgba(150,10,5,.75));
+    transition:opacity .18s;
+  }
+  #doombanner{
+    position:absolute; left:50%; top:26%; transform:translateX(-50%); z-index:8; pointer-events:none;
+    color:#ffb64a; font-size:26px; letter-spacing:8px; font-weight:700; text-align:center; opacity:0;
+    text-shadow:0 0 18px rgba(255,90,20,.8), 0 3px 0 #2a0603; transition:opacity .35s;
+  }
+  #doombanner.on{ opacity:1; }
+  #doomover{
+    position:absolute; inset:0; display:none; align-items:center; justify-content:center; z-index:12;
+    background:radial-gradient(circle at 50% 45%, rgba(60,6,3,.75), rgba(0,0,0,.93));
+  }
+  #doomover.on{ display:flex; }
+  #doomover .dbox{
+    text-align:center; color:#f0cfae; padding:26px 40px; background:rgba(24,5,3,.96);
+    border:2px solid #8a2a16; border-radius:10px; box-shadow:0 0 40px rgba(120,20,0,.5);
+  }
+  #doomover h1{ margin:0 0 8px; font-size:30px; letter-spacing:7px; color:#ff5a2a; text-shadow:0 0 16px rgba(255,60,20,.6); }
+  #doomover p{ margin:4px 0; font-size:13px; letter-spacing:1px; color:#c99a7a; }
+  #doomover .dscore{ margin:14px 0 18px; font-size:12px; letter-spacing:2px; color:#c99a7a; }
+  #doomover .dscore span{ font-size:24px; color:#ffb64a; margin-left:8px; }
+  #doomover button{
+    font-family:inherit; font-size:12px; letter-spacing:2px; padding:9px 18px; margin:0 5px; cursor:pointer;
+    background:#3a1008; color:#ffd7bd; border:1px solid #ff6a3a; border-radius:4px;
+  }
+  #doomover button:hover{ background:#6b1a10; }
+  /* ---------- Ammo / reload readout ---------- */
+  #ammo{ position:absolute; right:16px; bottom:16px; display:none; text-align:right; z-index:9;
+    font-size:11px; letter-spacing:2px; color:#9fc4ac; pointer-events:none;
+    background:rgba(6,14,10,.55); border:1px solid rgba(60,120,90,.5); border-radius:4px; padding:7px 10px 8px; }
+  #ammo.on{ display:block; }
+  #ammo.hell{ bottom:84px; background:rgba(24,5,3,.55); border-color:rgba(150,50,25,.55); color:#c99a7a; }
+  #ammo .apips{ display:flex; gap:4px; justify-content:flex-end; margin-bottom:5px; }
+  #ammo .apip{ width:7px; height:16px; border-radius:2px; background:#141c18; border:1px solid #33513f; }
+  #ammo.hell .apip{ background:#1a0705; border-color:#6b2a18; }
+  #ammo .apip.live{ background:var(--amber); border-color:#ffdc9a; box-shadow:0 0 6px rgba(255,180,60,.5); }
+  #ammo .apip.load{ background:#7a5216; border-color:#c08a2e; }
+  #ammo .acount b{ color:#eafff2; font-size:14px; letter-spacing:1px; }
+  #ammo.hell .acount b{ color:#ffb090; }
+  #ammo .abar{ height:3px; margin-top:6px; background:#141c18; border:1px solid #33513f; border-radius:2px; overflow:hidden; }
+  #ammo .abar i{ display:block; height:100%; width:0%; background:var(--amber); }
+  #ammo.reloading .acount{ color:#ffb43c; animation:apulse .5s steps(2) infinite; }
+  #ammo.empty .acount{ color:#ff6a4a; }
+  @keyframes apulse{ 0%{opacity:1} 50%{opacity:.45} 100%{opacity:1} }
+  #crosshair.rl{ background:#ffb43c; transform:scale(.55); box-shadow:0 0 0 1px rgba(0,0,0,.6), 0 0 9px rgba(255,180,60,.85); }
+
+  /* ---------- Pause: loadout / upgrades ---------- */
+  #pause h3{ margin:14px 0 5px; font-size:11px; letter-spacing:4px; color:var(--amber); font-weight:700; }
+  #pause .phell{ font-size:11px; letter-spacing:2px; color:#ff8a5a; margin:-6px 0 12px; }
+  #pause .pstats{ display:block; text-align:left; margin:0 auto 4px; font-size:12px; line-height:1.85; width:300px; }
+  #pause .srow{ display:flex; justify-content:space-between; gap:18px; color:#8fbfa5; letter-spacing:1px; }
+  #pause .srow b{ color:#eafff2; font-weight:400; }
+  #pause .srow.up b{ color:#7dffb0; }
+  #pause .srow .tag{ font-size:9px; letter-spacing:2px; color:#4f6f5c; }
+  #pause .srow.up .tag{ color:var(--amber); }
+  #pause .pnote{ margin-top:9px; font-size:10px; letter-spacing:1px; color:#6f8f7c; text-align:center; }
 </style>
 </head>
 <body>
@@ -242,8 +318,9 @@
     <div class="keys">
       <div><span>WASD</span> move &nbsp; <span>MOUSE</span> look</div>
       <div><span>LEFT-CLICK</span> terminal &nbsp; <span>M</span> map &nbsp; <span>P</span> pause &nbsp; <span>ESC</span> exit</div>
-      <div><span>2</span> draw revolver / <span>1</span> holster &nbsp; then <span>LEFT-CLICK</span> to shoot a terminal</div>
+      <div><span>2</span> draw revolver / <span>1</span> holster &nbsp; <span>LEFT-CLICK</span> shoot &nbsp; <span>R</span> reload</div>
       <div style="margin-top:10px;color:#cfeede">Solve terminals to collect keys and open the maze doors</div>
+      <div style="margin-top:4px;color:#cfeede">Every puzzle you <i>solve</i> earns a permanent upgrade — press [P] to see your loadout</div>
       <div style="margin-top:4px;color:#cfeede">Click anywhere to begin</div>
     </div>
   </div>
@@ -268,8 +345,34 @@
     <div class="pausebox">
       <h2>PAUSED</h2>
       <div class="ptime">TIME<span id="pause-time">0:00</span></div>
+      <div class="phell" id="pause-hell"></div>
       <div class="pdone" id="pause-progress"></div>
+      <h3>LOADOUT</h3>
+      <div class="pstats" id="pause-stats"></div>
       <div><button id="pause-resume">RESUME</button><button id="pause-restart">RESTART</button></div>
+    </div>
+  </div>
+
+  <div id="ammo">
+    <div class="apips" id="ammo-pips"></div>
+    <div class="acount" id="ammo-count">AMMO <b>6</b>/6</div>
+    <div class="abar"><i id="ammo-bar"></i></div>
+  </div>
+
+  <div id="doomflash"></div>
+  <div id="doomhud">
+    <div class="dstat"><b id="d-hp">100</b><span>HEALTH</span></div>
+    <div class="dstat"><b id="d-wave">1</b><span>WAVE</span></div>
+    <div class="dstat"><b id="d-left">0</b><span>DEMONS</span></div>
+    <div class="dstat"><b id="d-kills">0</b><span>KILLS</span></div>
+  </div>
+  <div id="doombanner"></div>
+  <div id="doomover">
+    <div class="dbox">
+      <h1 id="do-title">YOU DIED</h1>
+      <p id="do-sub">The demons feast tonight.</p>
+      <div class="dscore">DEMONS SLAIN<span id="do-kills">0</span></div>
+      <div><button id="do-retry">FIGHT AGAIN</button><button id="do-leave">BACK TO THE MAZE</button></div>
     </div>
   </div>
 
@@ -461,7 +564,15 @@ COMPUTERS.forEach((t,i)=>{
   screenMesh.position.set(x,1.66,zf+0.31); screenMesh.userData.computer=i;
   scene.add(screenMesh); interactables.push(screenMesh);
   t.screenMesh=screenMesh; t.broken=false;
+  // invisible hit volume around the WHOLE terminal (desk + case + screen) so a shot
+  // anywhere on the machine registers, not just dead-centre on the glass
+  const hitMesh=new THREEJS.Mesh(new THREEJS.BoxGeometry(2.7,2.4,1.8),
+    new THREEJS.MeshBasicMaterial({transparent:true,opacity:0,depthWrite:false}));
+  hitMesh.position.set(x,1.2,zf); hitMesh.userData.computer=i;
+  scene.add(hitMesh); interactables.push(hitMesh);
+  t.hitMesh=hitMesh;
   const pl=new THREEJS.PointLight(new THREEJS.Color(t.scr),0.6,5); pl.position.set(x,1.9,zf+1); scene.add(pl);
+  t.light=pl; t.solved=false;
   colliders.push({minX:x-1.25,maxX:x+1.25,minZ:zf-0.7,maxZ:zf+0.6});
 });
 
@@ -574,18 +685,76 @@ const rain=new THREEJS.LineSegments(rainGeo, new THREEJS.LineBasicMaterial({colo
 rain.frustumCulled=false; scene.add(rain); writeRain();
 
 // ---------------- Revolver viewmodel + shooting ----------------
-const brokenTex = tex((g,s)=>{
-  g.fillStyle='#0a0c0a'; g.fillRect(0,0,s,s);
-  g.strokeStyle='#24401f'; g.lineWidth=1;
-  const cx=s/2, cy=s/2;
-  for(let a=0;a<8;a++){ const ang=Math.random()*6.283; g.beginPath(); g.moveTo(cx,cy);
-    let x=cx,y=cy; for(let k=0;k<4;k++){ x+=Math.cos(ang)*s/8+(Math.random()*8-4); y+=Math.sin(ang)*s/8+(Math.random()*8-4); g.lineTo(x,y);} g.stroke(); }
-  g.fillStyle='#1c3324'; g.font='bold 8px monospace'; g.textAlign='center';
-  g.fillText('NO',s/2,s/2-2); g.fillText('SIGNAL',s/2,s/2+8);
-},64);
+// shattered CRT glass: an impact crater, a web of cracks around it and a few
+// wedges of glass missing outright. Built fresh per terminal so no two dead
+// screens look the same.
+function brokenScreenTex(tint){
+  return tex((g,s)=>{
+    g.fillStyle='#08090a'; g.fillRect(0,0,s,s);
+    // ghost of whatever it was displaying when the round went through it
+    const gr=g.createRadialGradient(s*.5,s*.5,1,s*.5,s*.5,s*.62);
+    gr.addColorStop(0,tint); gr.addColorStop(1,'#000000');
+    g.globalAlpha=.17; g.fillStyle=gr; g.fillRect(0,0,s,s);
+    g.globalAlpha=.13; g.fillStyle='#000000';
+    for(let y=0;y<s;y+=3) g.fillRect(0,y,s,1);
+    // a diagonal sheen so the intact glass still reads as glass, not a hole
+    const sh=g.createLinearGradient(0,s,s,0);
+    sh.addColorStop(0,'rgba(255,255,255,0)'); sh.addColorStop(.42,'rgba(190,215,205,.11)');
+    sh.addColorStop(.55,'rgba(190,215,205,.05)'); sh.addColorStop(1,'rgba(255,255,255,0)');
+    g.fillStyle=sh; g.fillRect(0,0,s,s);
+    g.globalAlpha=1;
+
+    const cx=s*(.34+Math.random()*.32), cy=s*(.30+Math.random()*.36);
+    const N=9+((Math.random()*4)|0), rays=[];
+    for(let i=0;i<N;i++){
+      let a=i/N*6.283+(Math.random()-.5)*.38, x=cx, y=cy;
+      const pts=[[x,y]], reach=s*.26;
+      for(let k=0;k<5;k++){ a+=(Math.random()-.5)*.44; x+=Math.cos(a)*reach; y+=Math.sin(a)*reach; pts.push([x,y]); }
+      rays.push(pts);
+    }
+    function line(pts,col,w,al){
+      g.globalAlpha=al; g.strokeStyle=col; g.lineWidth=w; g.lineJoin='round';
+      g.beginPath(); g.moveTo(pts[0][0],pts[0][1]);
+      for(let i=1;i<pts.length;i++) g.lineTo(pts[i][0],pts[i][1]);
+      g.stroke(); g.globalAlpha=1;
+    }
+    // wedges where the glass fell out completely
+    for(let i=0;i<rays.length;i++){
+      if(Math.random()>=.4) continue;
+      const a=rays[i], b=rays[(i+1)%rays.length], depth=2+((Math.random()*2)|0);
+      g.beginPath(); g.moveTo(cx,cy);
+      for(let k=1;k<=depth;k++) g.lineTo(a[k][0],a[k][1]);
+      for(let k=depth;k>=1;k--) g.lineTo(b[k][0],b[k][1]);
+      g.closePath();
+      g.fillStyle = Math.random()<.55 ? '#000000' : '#171d1a'; g.fill();
+    }
+    // ring cracks tying the radials together
+    [1,2,3].forEach(idx=>{
+      g.beginPath();
+      rays.forEach((p,i)=>{ const q=p[idx]; i ? g.lineTo(q[0],q[1]) : g.moveTo(q[0],q[1]); });
+      g.closePath();
+      g.globalAlpha=.8; g.strokeStyle='#000000'; g.lineWidth=2.4; g.stroke();
+      g.globalAlpha=.38; g.strokeStyle='#cfe9dc'; g.lineWidth=1; g.stroke();
+      g.globalAlpha=1;
+    });
+    rays.forEach(p=>{ line(p,'#000000',3,.92); line(p,'#dff3e8',1,.62); });
+    // the hole itself
+    g.beginPath(); g.arc(cx,cy,s*.055,0,6.283); g.fillStyle='#000000'; g.fill();
+    g.globalAlpha=.55; g.strokeStyle='#e6f6ee'; g.lineWidth=1.4;
+    g.beginPath(); g.arc(cx,cy,s*.062,0,6.283); g.stroke(); g.globalAlpha=1;
+    // glass dust + vignette so the dead screen reads flat, not lit
+    g.globalAlpha=.35; g.fillStyle='#9fb8ab';
+    for(let i=0;i<60;i++) g.fillRect((Math.random()*s)|0,(Math.random()*s)|0,1,1);
+    g.globalAlpha=1;
+    const vg=g.createRadialGradient(s/2,s/2,s*.22,s/2,s/2,s*.72);
+    vg.addColorStop(0,'rgba(0,0,0,0)'); vg.addColorStop(1,'rgba(0,0,0,.78)');
+    g.fillStyle=vg; g.fillRect(0,0,s,s);
+  },128);
+}
+const brokenFx=[];   // shot terminals whose electronics are still arcing
 
 scene.add(camera); // needed so a camera-attached viewmodel is rendered
-let gunOut=false, gunRecoil=0, muzzle=null;
+let gunOut=false, gunRecoil=0, muzzle=null, cylMesh=null;
 const gunGroup=new THREEJS.Group();
 (function buildRevolver(){
   const dark =new THREEJS.MeshBasicMaterial({color:0x24282c});
@@ -595,7 +764,7 @@ const gunGroup=new THREEJS.Group();
     m.position.set(x,y,z); if(rx)m.rotation.x=rx; if(ry)m.rotation.y=ry; if(rz)m.rotation.z=rz; gunGroup.add(m); return m; }
   part(new THREEJS.BoxGeometry(0.045,0.05,0.30), dark,  0, 0.03, -0.15);          // barrel
   part(new THREEJS.BoxGeometry(0.02,0.02,0.30),  steel, 0, 0.065,-0.15);          // top rib
-  part(new THREEJS.CylinderGeometry(0.052,0.052,0.10,8), steel, 0,0.02,0.03, Math.PI/2,0,0); // cylinder
+  cylMesh=part(new THREEJS.CylinderGeometry(0.052,0.052,0.10,8), steel, 0,0.02,0.03, Math.PI/2,0,0); // cylinder
   part(new THREEJS.BoxGeometry(0.05,0.09,0.12),  dark,  0, 0.0,  0.05);           // frame
   part(new THREEJS.BoxGeometry(0.05,0.15,0.07),  grip,  0,-0.10, 0.11, -0.35,0,0);// grip
   part(new THREEJS.BoxGeometry(0.03,0.04,0.03),  steel, 0, 0.07, 0.10);           // hammer
@@ -610,10 +779,84 @@ gunGroup.rotation.y=0.05;
 gunGroup.visible=false;
 camera.add(gunGroup);
 
-function drawGun(){ if(mode!=='world') return; gunOut=true; gunGroup.visible=true; }
-function holsterGun(){ gunOut=false; gunGroup.visible=false; }
+/* ---------------- permanent upgrades (one per puzzle SOLVED) ----------------
+   Shooting a terminal open still grants its key, but skipping the puzzle skips
+   the upgrade -- solve first, then shoot, if you want a full loadout in hell. */
+const STATS = { dmg:34, reloadMul:1, speedMul:1, mag:6, lv:{dmg:0,reload:0,speed:0,mag:0} };
+const UPGRADES = [
+  { id:'dmg',    name:'HOLLOW POINTS',     desc:'+50% bullet damage',
+    apply(){ STATS.dmg=Math.round(STATS.dmg*1.5); STATS.lv.dmg++; } },
+  { id:'reload', name:'SPEED LOADER',      desc:'35% faster reloads',
+    apply(){ STATS.reloadMul*=0.65; STATS.lv.reload++; } },
+  { id:'speed',  name:'COMBAT BOOTS',      desc:'+22% move speed',
+    apply(){ STATS.speedMul*=1.22; STATS.lv.speed++; } },
+  { id:'mag',    name:'EXTENDED CYLINDER', desc:'+3 rounds per cylinder',
+    apply(){ STATS.mag+=3; ammo=STATS.mag; STATS.lv.mag++; } },
+];
+let upgradeIdx=0;
+function grantUpgrade(){
+  if(upgradeIdx>=UPGRADES.length) return;
+  const u=UPGRADES[upgradeIdx++]; u.apply(); ammoHud();
+  setTimeout(()=>dBanner('UPGRADE ACQUIRED<br><span style="font-size:15px;letter-spacing:5px;color:#ffd24a">'+u.name+
+    '</span><br><span style="font-size:12px;letter-spacing:3px">'+u.desc+'</span>', 3600), 400);
+  tone(320,880,0.28,'triangle',0.10);
+}
+
+/* ---------------- ammunition + reloading ---------------- */
+const ammoEl=document.getElementById('ammo');
+const ammoPipsEl=document.getElementById('ammo-pips');
+const ammoCountEl=document.getElementById('ammo-count');
+const ammoBarEl=document.getElementById('ammo-bar');
+let ammo=6, reloading=false, reloadT=0, reloadDur=1, pipCache='';
+function reloadTime(){ return 1.7*STATS.reloadMul; }
+function ammoHud(){
+  ammoEl.classList.toggle('on', (mode==='world'&&gunOut) || mode==='doom');
+  ammoEl.classList.toggle('hell', doomActive);
+  ammoEl.classList.toggle('reloading', reloading);
+  ammoEl.classList.toggle('empty', !reloading && ammo<=0);
+  crossEl.classList.toggle('rl', reloading);
+  const prog = reloading ? 1-Math.max(0,reloadT)/reloadDur : 1;
+  const filled = reloading ? Math.floor(STATS.mag*prog) : ammo;
+  const key = STATS.mag+'|'+filled+'|'+(reloading?'r':'n');
+  if(key!==pipCache){
+    pipCache=key;
+    let h='';
+    for(let i=0;i<STATS.mag;i++) h+='<div class="apip'+(i<filled?(reloading?' load':' live'):'')+'"></div>';
+    ammoPipsEl.innerHTML=h;
+    ammoCountEl.innerHTML = reloading ? 'RELOADING' : 'AMMO <b>'+ammo+'</b>/'+STATS.mag;
+  }
+  ammoBarEl.style.width = reloading ? (prog*100).toFixed(0)+'%' : '0%';
+}
+function startReload(){
+  if(reloading || ammo>=STATS.mag) return;
+  if(!doomActive && (mode!=='world' || !gunOut)) return;
+  reloading=true; reloadDur=reloadTime(); reloadT=reloadDur;
+  tone(230,120,0.10,'triangle',0.07);
+  ammoHud();
+}
+function finishReload(){
+  reloading=false; ammo=STATS.mag;
+  tone(150,340,0.09,'square',0.09);
+  if(cylMesh) cylMesh.rotation.y=0;
+  ammoHud();
+}
+function canFire(){
+  if(reloading) return false;
+  if(ammo<=0){ tone(340,150,0.05,'square',0.06); startReload(); return false; }  // dry click
+  return true;
+}
+function spendRound(){
+  ammo--; ammoHud();
+  if(ammo<=0) setTimeout(startReload, 180);   // let the recoil play before the cylinder swings out
+}
+
+function drawGun(){ if(mode!=='world') return; gunOut=true; gunGroup.visible=true; ammoHud(); }
+function holsterGun(){ gunOut=false; gunGroup.visible=false; reloading=false; ammoHud(); }
 function shoot(){
+  if(doomActive){ doomShoot(); return; }
   if(!gunOut) return;
+  if(!canFire()) return;
+  spendRound();
   gunRecoil=1; playShot();
   muzzle.visible=true; setTimeout(()=>{ if(muzzle) muzzle.visible=false; }, 60);
   ray.setFromCamera({x:0,y:0}, camera);
@@ -625,9 +868,18 @@ function shoot(){
 }
 function breakTerminal(i){
   const t=COMPUTERS[i]; if(t.broken) return; t.broken=true;
-  if(t.screenMesh){ t.screenMesh.material.map=brokenTex; t.screenMesh.material.needsUpdate=true; }
-  if(t.caseMesh){ t.caseMesh.material.color.setHex(0x1e1c16); t.caseMesh.rotation.z+=0.28; t.caseMesh.position.y-=0.08; }
-  const idx=interactables.indexOf(t.screenMesh); if(idx>=0) interactables.splice(idx,1);
+  const TILT=0.07;   // screen and case tilt together so the machine doesn't come apart
+  if(t.screenMesh){
+    const m=t.screenMesh.material;
+    m.map=brokenScreenTex(t.scr);        // a fresh crack web for this screen
+    m.color.setHex(0x8b938c);            // no longer self-lit: dead grey glass
+    m.needsUpdate=true;
+    t.screenMesh.rotation.z=TILT; t.screenMesh.position.y-=0.045;
+  }
+  if(t.caseMesh){ t.caseMesh.material.color.setHex(0x2c2a24); t.caseMesh.rotation.z=TILT; t.caseMesh.position.y-=0.045; }
+  if(t.light){ t.light.color.setHex(0xffb15a); t.light.intensity=2.6; t.spark=1; t.sparkT=0.05; brokenFx.push(t); }
+  [t.screenMesh,t.hitMesh].forEach(msh=>{ const idx=interactables.indexOf(msh); if(idx>=0) interactables.splice(idx,1); });
+  if(allTerminalsShot()) setTimeout(()=>{ if(mode==='world') dBanner('EVERY TERMINAL IS DEAD<br><span style="font-size:13px;letter-spacing:4px">SOMETHING IS WRONG WITH THE CAKE</span>', 3400); }, 500);
   markDone(t.game); // busted open -> grab its key (and swing its door open)
 }
 
@@ -676,7 +928,7 @@ function beginPlay(){
 }
 
 document.addEventListener('mousemove', e=>{
-  if(mode!=='world' || !started) return;
+  if((mode!=='world' && mode!=='doom') || !started) return;
   // free-look when the pointer is locked; otherwise hold LEFT mouse to drag-look
   if(locked || (e.buttons & 1)){
     yaw   -= e.movementX * SENS;
@@ -685,10 +937,16 @@ document.addEventListener('mousemove', e=>{
   }
 });
 document.addEventListener('mousedown', e=>{
+  if(mode==='doom'){ if(e.button===0) doomShoot();
+    if(!locked) reLock(); return; }
   if(mode!=='world') return;
   if(!started){ beginPlay(); return; }
+  // the cake always wins over the trigger finger, otherwise a drawn revolver
+  // would make it impossible to touch it
+  if(e.button===0 && activeCake){
+    if(allTerminalsShot() && !doomCleared){ enterHell(); return; }
+    winGame(); return; }
   if(e.button===0 && gunOut){ shoot(); return; }
-  if(e.button===0 && activeCake){ winGame(); return; }
   if(e.button===0 && activeComp!=null){ openComputer(activeComp); return; }
   if(!locked && canvas.requestPointerLock) canvas.requestPointerLock(); // try to (re)acquire lock on click
 });
@@ -707,9 +965,11 @@ document.addEventListener('keydown', e=>{
     return;
   }
   if(e.code==='KeyP'){ pauseGame(); return; }
-  if(e.code==='KeyM'){ toggleMap(); return; }
+  if(e.key==='Escape'){ pauseGame(); return; }
+  if(e.code==='KeyR'){ startReload(); return; }
+  if(e.code==='KeyM'){ if(!doomActive) toggleMap(); return; }
   if(e.code==='Digit2'){ drawGun(); return; }
-  if(e.code==='Digit1'){ holsterGun(); return; }
+  if(e.code==='Digit1'){ if(!doomActive) holsterGun(); return; }
   keys[e.code]=true;
 });
 document.addEventListener('keyup', e=>{ keys[e.code]=false; });
@@ -730,19 +990,46 @@ function blocked(x,z){
 function update(dt){
   for(let i=0;i<RAIN_N;i++){ rainY[i]-=dt*24; if(rainY[i]<0) rainY[i]=26+Math.random()*4; }
   writeRain();
+  if(mode!=='paused' && reloading){
+    reloadT-=dt;
+    if(reloadT<=0) finishReload(); else ammoHud();
+  }
   if(gunGroup && gunGroup.visible){
-    gunGroup.position.z = -0.48 + gunRecoil*0.09;
-    gunGroup.rotation.x = -gunRecoil*0.22;
-    if(gunRecoil>0) gunRecoil=Math.max(0, gunRecoil-dt*6);
+    if(reloading){
+      // cylinder swings out and spins, muzzle dips, then everything snaps back
+      const p=1-Math.max(0,reloadT)/reloadDur, sw=Math.sin(Math.min(1,p)*Math.PI);
+      gunGroup.position.z = -0.48;
+      gunGroup.position.y = -0.22 - sw*0.10;
+      gunGroup.rotation.z = sw*0.62;
+      gunGroup.rotation.x = -sw*0.20;
+      if(cylMesh) cylMesh.rotation.y = p*Math.PI*4;
+      gunRecoil=0;
+    } else {
+      gunGroup.position.y = -0.22;
+      gunGroup.rotation.z = 0;
+      gunGroup.position.z = -0.48 + gunRecoil*0.09;
+      gunGroup.rotation.x = -gunRecoil*0.22;
+      if(gunRecoil>0) gunRecoil=Math.max(0, gunRecoil-dt*6);
+    }
+  }
+  // shot-out terminals keep arcing for a while, dimmer each time
+  for(let i=brokenFx.length-1;i>=0;i--){
+    const t=brokenFx[i];
+    t.sparkT-=dt;
+    if(t.sparkT>0) continue;
+    t.sparkT=0.05+Math.random()*0.55; t.spark*=0.93;
+    if(t.spark<0.08){ t.light.intensity=0.04; brokenFx.splice(i,1); continue; }
+    t.light.intensity = (t.light.intensity>0.4 ? 0.05 : (Math.random()<0.4?1.6:0.4)) * Math.max(0.08,t.spark);
   }
   for(const d of doors)
     if(d.opening && d.grp.position.y < d.openY)
       d.grp.position.y = Math.min(d.openY, d.grp.position.y + 3.2*dt);
   if(cakeLight) cakeLight.intensity = 1.0 + Math.sin(performance.now()*0.008)*0.12;
   if(mapOpen) drawMap();
+  if(doomActive){ if(mode==='doom') updateDoom(dt); return; }
   if(mode==='world' && started){
     camera.rotation.y=yaw; camera.rotation.x=pitch;
-    const speed=(keys['ShiftLeft']?5.4:3.2)*dt;
+    const speed=(keys['ShiftLeft']?5.4:3.2)*STATS.speedMul*dt;
     let f=0,s=0;
     if(keys['KeyW'])f+=1; if(keys['KeyS'])f-=1;
     if(keys['KeyD'])s+=1; if(keys['KeyA'])s-=1;
@@ -759,7 +1046,9 @@ function update(dt){
       const ud=hit.object.userData;
       if(ud.cake){
         activeComp=null; activeCake=true;
-        promptEl.innerHTML='▶ LEFT-CLICK the <b style="color:#ff8fb8">birthday cake</b>!';
+        promptEl.innerHTML = (allTerminalsShot() && !doomCleared)
+          ? '▶ LEFT-CLICK the <b style="color:#ff5a2a">cake</b> — <b style="color:#ff5a2a">IT IS BREATHING</b>'
+          : '▶ LEFT-CLICK the <b style="color:#ff8fb8">birthday cake</b>!';
         promptEl.style.opacity='1';
       } else if(ud.door){
         activeComp=null; activeCake=false; const dr=ud.doorRef;
@@ -787,39 +1076,582 @@ function winGame(){
   playDing();
   const ms = elapsedMs();
   document.getElementById('win-time').textContent = fmtTime(ms);
+  const sub=document.querySelector('#win .sub');
+  if(sub && doomCleared) sub.innerHTML='You solved every terminal, cleared HELL ('+D.kills+' demons slain) and reached the cake.';
   document.getElementById('win').classList.add('on');
 }
 document.getElementById('win-reset').addEventListener('click', ()=> location.reload());
 
+let pausePrev='world';
+function renderStats(){
+  const box=document.getElementById('pause-stats'); box.innerHTML='';
+  [['DAMAGE', STATS.dmg+' / shot', STATS.lv.dmg],
+   ['RELOAD', reloadTime().toFixed(2)+'s', STATS.lv.reload],
+   ['MOVE SPEED', Math.round(STATS.speedMul*100)+'%', STATS.lv.speed],
+   ['CYLINDER', STATS.mag+' rounds', STATS.lv.mag]].forEach(r=>{
+    const row=el('div','srow'+(r[2]?' up':''));
+    row.appendChild(el('span',null,r[0]));
+    const right=el('span');
+    right.innerHTML='<b>'+r[1]+'</b> <span class="tag">'+(r[2]?'UPGRADED':'BASE')+'</span>';
+    row.appendChild(right); box.appendChild(row);
+  });
+  const left=UPGRADES.length-upgradeIdx;
+  box.appendChild(el('div','pnote', left
+    ? left+' upgrade'+(left>1?'s':'')+' left \u2014 solve a terminal puzzle to earn the next'
+    : 'Every upgrade acquired'));
+}
 function pauseGame(){
-  if(!started || mode!=='world') return;
+  if(!started) return;
+  if(mode!=='world' && mode!=='doom') return;   // hell pauses too; the death screens don't
+  pausePrev=mode;
   mode='paused'; pauseAt=performance.now();
   if(document.exitPointerLock) document.exitPointerLock();
   promptEl.style.opacity='0'; crossEl.style.opacity='0';
   mapOpen=false; mapEl.classList.remove('on');
   document.getElementById('pause-time').textContent=fmtTime(elapsedMs());
+  const hellRow=document.getElementById('pause-hell');
+  if(pausePrev==='doom'){
+    hellRow.style.display='';
+    hellRow.innerHTML='IN HELL \u2014 '+Math.max(0,Math.ceil(D.hp))+' HP \u00b7 WAVE '+D.wave+'/'+WAVES.length+' \u00b7 '+D.kills+' SLAIN';
+  } else hellRow.style.display='none';
   const prog=document.getElementById('pause-progress'); prog.innerHTML='';
   COMPUTERS.forEach(c=>{
     const d=keysHeld[c.key];
-    prog.appendChild(el('div','prow'+(d?' done':''), (d?'\u2713 ':'\u25A1 ')+c.label));
+    const how = c.solved ? ' (solved)' : (c.broken ? ' (shot out)' : '');
+    prog.appendChild(el('div','prow'+(d?' done':''), (d?'\u2713 ':'\u25A1 ')+c.label+how));
   });
+  renderStats();
+  ammoHud();
   document.getElementById('pause').classList.add('on');
 }
 function resumeGame(){
   if(mode!=='paused') return;
-  pausedTotal += performance.now()-pauseAt;
-  mode='world';
+  // a hell trip is subtracted from the run wholesale on exit, so only maze pauses count here
+  if(pausePrev!=='doom') pausedTotal += performance.now()-pauseAt;
+  mode=pausePrev;
   document.getElementById('pause').classList.remove('on');
   crossEl.style.opacity='1';
-  if(canvas.requestPointerLock) canvas.requestPointerLock();
+  ammoHud();
+  reLock();
 }
 document.getElementById('pause-resume').addEventListener('click', resumeGame);
 document.getElementById('pause-restart').addEventListener('click', ()=> location.reload());
 
+/* ============================================================
+   HELL BREACH — secret DOOM-style arena
+   Trigger: shoot out every terminal with the revolver, then
+   interact with the birthday cake. Fight your way back out.
+   ============================================================ */
+const doomScene = new THREEJS.Scene();
+doomScene.fog = new THREEJS.Fog(0x2a0a06, 16, 72);   // far enough that demons stay readable across the arena
+
+const ARENA = 22;                 // half-extent of the arena floor
+const dColliders = [];            // AABBs inside hell
+const lavaPools  = [];            // hurt-you-if-you-stand-in-it discs
+const monsters = [], fireballs = [], spawnQueue = [];
+let doomActive = false, doomCleared = false, doomEnterAt = 0;
+const D = { hp:100, kills:0, wave:0, gap:0, spawnT:0, cool:0, dead:false, waiting:true };
+let doomFlashTimer=null, doomFlashActive=false;
+
+const hellFloorTex = tex((g,s)=>{
+  g.fillStyle='#3a1410'; g.fillRect(0,0,s,s);
+  g.fillStyle='#4a1a12';
+  for(let y=0;y<s;y+=16)for(let x=0;x<s;x+=16) if(((x/16)+(y/16))%2) g.fillRect(x,y,16,16);
+  g.strokeStyle='#240a08';
+  for(let i=0;i<=s;i+=16){ g.beginPath(); g.moveTo(i,0); g.lineTo(i,s); g.moveTo(0,i); g.lineTo(s,i); g.stroke(); }
+  g.fillStyle='#5c2016'; for(let i=0;i<60;i++) g.fillRect(Math.random()*s|0,Math.random()*s|0,2,2);
+},64);
+hellFloorTex.wrapS=hellFloorTex.wrapT=THREEJS.RepeatWrapping; hellFloorTex.repeat.set(14,14);
+
+const hellWallTex = tex((g,s)=>{
+  g.fillStyle='#4a2018'; g.fillRect(0,0,s,s);
+  g.fillStyle='#3a170f';
+  for(let y=0;y<s;y+=16){ const off=(y/16)%2?8:0; for(let x=-8;x<s;x+=16) g.fillRect(x+off+1,y+1,14,14); }
+  g.fillStyle='#c9b79a'; g.fillRect(26,24,12,10); g.fillRect(28,34,8,3);      // skull
+  g.fillStyle='#1a0605'; g.fillRect(28,27,3,3); g.fillRect(34,27,3,3); g.fillRect(31,31,2,3);
+  g.fillStyle='#6e2416'; for(let i=0;i<30;i++) g.fillRect(Math.random()*s|0,Math.random()*s|0,2,2);
+},64);
+hellWallTex.wrapS=hellWallTex.wrapT=THREEJS.RepeatWrapping;
+
+const lavaTex = tex((g,s)=>{
+  g.fillStyle='#ff7a1e'; g.fillRect(0,0,s,s);
+  g.fillStyle='#ffcf4a'; for(let i=0;i<70;i++) g.fillRect(Math.random()*s|0,Math.random()*s|0,4,3);
+  g.fillStyle='#c33a08'; for(let i=0;i<50;i++) g.fillRect(Math.random()*s|0,Math.random()*s|0,5,3);
+},64);
+
+function dbox(w,h,d,mat,x,y,z,solid){
+  const m=new THREEJS.Mesh(new THREEJS.BoxGeometry(w,h,d),mat);
+  m.position.set(x,y,z); doomScene.add(m);
+  if(solid) dColliders.push({minX:x-w/2,maxX:x+w/2,minZ:z-d/2,maxZ:z+d/2});
+  return m;
+}
+
+(function buildArena(){
+  const A=ARENA, WH=9;
+  const floorMat=new THREEJS.MeshLambertMaterial({map:hellFloorTex});
+  const fl=new THREEJS.Mesh(new THREEJS.PlaneGeometry(A*2,A*2), floorMat);
+  fl.rotation.x=-Math.PI/2; doomScene.add(fl);
+  const wallMatH=new THREEJS.MeshLambertMaterial({map:hellWallTex.clone()});
+  wallMatH.map.wrapS=wallMatH.map.wrapT=THREEJS.RepeatWrapping; wallMatH.map.repeat.set(10,2);
+  dbox(A*2+4,WH,2, wallMatH, 0,WH/2,-A-1, true);
+  dbox(A*2+4,WH,2, wallMatH, 0,WH/2, A+1, true);
+  dbox(2,WH,A*2+4, wallMatH, -A-1,WH/2,0, true);
+  dbox(2,WH,A*2+4, wallMatH,  A+1,WH/2,0, true);
+
+  // broken pillars for cover
+  const pillarMat=new THREEJS.MeshPhongMaterial({map:hellWallTex,flatShading:true,shininess:0});
+  [[-11,-11],[11,-11],[-11,11],[11,11],[0,-6]].forEach(([px,pz],i)=>{
+    const h = i===4 ? 3.2 : 6.5;
+    dbox(2.6,h,2.6, pillarMat, px,h/2,pz, true);
+  });
+
+  // lava pools (standing in one burns)
+  const lavaMat=new THREEJS.MeshBasicMaterial({map:lavaTex});
+  [[-15,4,3.6],[14,-14,4.4],[3,15,3.0]].forEach(([lx,lz,lr])=>{
+    const disc=new THREEJS.Mesh(new THREEJS.CircleGeometry(lr,14), lavaMat);
+    disc.rotation.x=-Math.PI/2; disc.position.set(lx,0.03,lz); doomScene.add(disc);
+    const pl=new THREEJS.PointLight(0xff6a20,1.1,18); pl.position.set(lx,2.2,lz); doomScene.add(pl);
+    lavaPools.push({x:lx,z:lz,r:lr,light:pl});
+  });
+
+  // an altar where the cake should have been
+  const altarMat=new THREEJS.MeshPhongMaterial({color:0x2b1410,flatShading:true,shininess:0});
+  dbox(3.2,1.2,3.2, altarMat, 0,0.6,0, true);
+  const sigil=new THREEJS.Mesh(new THREEJS.CircleGeometry(1.3,5),
+    new THREEJS.MeshBasicMaterial({color:0xff3a1a}));
+  sigil.rotation.x=-Math.PI/2; sigil.position.set(0,1.22,0); doomScene.add(sigil);
+
+})();
+
+doomScene.add(new THREEJS.HemisphereLight(0x8a3a20, 0x2a0a06, 0.95));
+doomScene.add(new THREEJS.AmbientLight(0x5a2010, 0.8));
+const doomKey = new THREEJS.DirectionalLight(0xff8a4a, 0.45);
+doomKey.position.set(4,12,6); doomScene.add(doomKey);
+const doomTorch = new THREEJS.PointLight(0xffa050, 0.9, 26);
+doomTorch.position.set(0,6,0); doomScene.add(doomTorch);
+
+/* ---------------- demon sprites (hand-drawn pixel art) ---------------- */
+function px(g){ return (x,y,w,h,c)=>{ g.fillStyle=c; g.fillRect(x,y,w,h); }; }
+
+function impTex(f){ return tex((g,s)=>{
+  const P=px(g), skin='#a85c30', body='#8f4a24', dark='#5f2f14', a=f?2:-2, l=f?3:0;
+  P(16,6,5,10,dark); P(43,6,5,10,dark);                 // horns
+  P(19,3,5,5,dark);  P(40,3,5,5,dark);
+  P(20,12,24,16,skin); P(20,12,24,3,body);              // head
+  P(24,17,7,5,'#ffe14a'); P(33,17,7,5,'#ffe14a');       // eyes
+  P(26,18,3,3,'#ff3a1a'); P(35,18,3,3,'#ff3a1a');
+  P(25,24,14,4,'#25090a');                              // maw
+  P(27,24,2,3,'#f3e6cf'); P(31,24,2,3,'#f3e6cf'); P(35,24,2,3,'#f3e6cf');
+  P(20,28,24,20,body); P(24,31,16,11,dark);             // torso
+  P(11,29+a,8,16,skin); P(45,29-a,8,16,skin);           // arms
+  P(9,43+a,7,5,'#e8d8b8'); P(47,43-a,7,5,'#e8d8b8');    // claws
+  P(22,48,9,15-l,skin); P(33,48,9,12+l,skin);           // legs
+  P(20,60,12,4,dark);  P(32,60,12,4,dark);              // hooves
+},64); }
+
+function pinkyTex(f){ return tex((g,s)=>{
+  const P=px(g), skin='#c2637a', dark='#8e3c50', a=f?2:-2;
+  P(10,20,44,26,skin); P(10,20,44,5,dark);              // bulk
+  P(14,44,10,14+ (f?0:3),dark); P(40,44,10,14-(f?0:3),dark); // legs
+  P(6,26,10,16,dark); P(48,26,10,16,dark);              // shoulders
+  P(18,26,28,10,'#25090a');                             // jaw cavity
+  for(let i=0;i<7;i++){ P(19+i*4,26,3,5,'#f3e6cf'); P(21+i*4,31,3,5,'#f3e6cf'); }
+  P(16,16,10,7,'#fff2c0'); P(38,16,10,7,'#fff2c0');     // eyes
+  P(19,18,4,4,'#c81a10'); P(41,18,4,4,'#c81a10');
+  P(12,12+a,6,8,dark); P(46,12-a,6,8,dark);             // ear nubs
+},64); }
+
+function baronTex(f){ return tex((g,s)=>{
+  const P=px(g), skin='#9aa35a', dark='#5f6a2e', a=f?3:-3;
+  P(12,4,7,14,'#e8dcc0'); P(45,4,7,14,'#e8dcc0');       // huge horns
+  P(16,1,7,6,'#e8dcc0');  P(41,1,7,6,'#e8dcc0');
+  P(18,14,28,16,skin); P(18,14,28,4,dark);
+  P(22,19,8,6,'#ffe14a'); P(34,19,8,6,'#ffe14a');
+  P(24,20,4,4,'#c81a10'); P(36,20,4,4,'#c81a10');
+  P(22,26,20,5,'#25090a');
+  for(let i=0;i<5;i++) P(23+i*4,26,3,5,'#f3e6cf');
+  P(16,30,32,22,skin); P(21,34,22,13,dark);             // torso
+  P(8,30+a,9,18,skin); P(47,30-a,9,18,skin);            // arms
+  P(6,46+a,9,6,'#e8dcc0'); P(49,46-a,9,6,'#e8dcc0');
+  P(19,52,10,10,skin); P(35,52,10,10,skin);             // hooved legs
+  P(17,60,13,4,'#3a3a1a'); P(34,60,13,4,'#3a3a1a');
+},64); }
+
+function corpseTex(col){ return tex((g,s)=>{
+  const P=px(g);
+  P(12,46,40,14,col); P(18,40,28,8,col);
+  P(20,50,6,6,'#7a1008'); P(36,52,8,5,'#7a1008');
+  P(8,54,10,6,'#7a1008'); P(46,52,10,6,'#7a1008');
+},64); }
+
+const ballTex = tex((g,s)=>{
+  const grd=g.createRadialGradient(s/2,s/2,2,s/2,s/2,s/2);
+  grd.addColorStop(0,'#fff4c0'); grd.addColorStop(0.35,'#ffb020');
+  grd.addColorStop(0.7,'#e04a10'); grd.addColorStop(1,'rgba(120,20,0,0)');
+  g.fillStyle=grd; g.fillRect(0,0,s,s);
+},32);
+
+const KIND = {
+  imp:   { hp:60,  speed:3.5, w:2.0, h:2.5, dmg:9,  reach:2.6, ranged:true,  atk:2.1, corpse:'#7a3c1c' },
+  pinky: { hp:120, speed:5.2, w:2.8, h:2.3, dmg:17, reach:2.8, ranged:false, atk:1.0, corpse:'#8e3c50' },
+  baron: { hp:300, speed:3.0, w:3.4, h:4.4, dmg:24, reach:3.4, ranged:true,  atk:1.5, corpse:'#5f6a2e' },
+};
+const SPRITES = {
+  imp:   [impTex(0),   impTex(1),   corpseTex(KIND.imp.corpse)],
+  pinky: [pinkyTex(0), pinkyTex(1), corpseTex(KIND.pinky.corpse)],
+  baron: [baronTex(0), baronTex(1), corpseTex(KIND.baron.corpse)],
+};
+
+const WAVES = [
+  ['imp','imp','imp','imp'],
+  ['imp','imp','pinky','imp','pinky'],
+  ['pinky','pinky','imp','imp','imp','pinky'],
+  ['baron','imp','imp','pinky','imp','pinky','imp'],
+];
+
+/* ---------------- little synth for hell SFX ---------------- */
+let AC=null;
+function actx(){ try{ if(!AC) AC=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} return AC; }
+function tone(f0,f1,dur,type,vol){
+  const c=actx(); if(!c) return;
+  const o=c.createOscillator(), g=c.createGain();
+  o.type=type||'square'; o.frequency.setValueAtTime(f0,c.currentTime);
+  o.frequency.exponentialRampToValueAtTime(Math.max(30,f1),c.currentTime+dur);
+  g.gain.setValueAtTime(vol||0.12,c.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001,c.currentTime+dur);
+  o.connect(g); g.connect(c.destination); o.start(); o.stop(c.currentTime+dur);
+}
+const sfxGrowl = ()=> tone(150,60,0.35,'sawtooth',0.10);
+const sfxHit   = ()=> tone(320,120,0.09,'square',0.09);
+const sfxGib   = ()=> tone(220,40,0.45,'sawtooth',0.16);
+const sfxHurt  = ()=> tone(180,70,0.28,'triangle',0.18);
+const sfxPort  = ()=> { tone(80,900,0.5,'sawtooth',0.14); setTimeout(()=>tone(900,60,0.6,'square',0.10),160); };
+
+/* ---------------- HUD ---------------- */
+const dHudEl=document.getElementById('doomhud'), dFlashEl=document.getElementById('doomflash');
+const dBanEl=document.getElementById('doombanner'), dOverEl=document.getElementById('doomover');
+let banTimer=null;
+function dBanner(text,ms){
+  dBanEl.innerHTML=text; dBanEl.classList.add('on');
+  clearTimeout(banTimer); banTimer=setTimeout(()=>dBanEl.classList.remove('on'), ms||2200);
+}
+function dHud(){
+  const hpEl=document.getElementById('d-hp');
+  hpEl.textContent=Math.max(0,Math.ceil(D.hp));
+  hpEl.classList.toggle('low', D.hp<=30);
+  document.getElementById('d-wave').textContent=D.wave+'/'+WAVES.length;
+  document.getElementById('d-left').textContent=monsters.filter(m=>!m.dying).length+spawnQueue.length;
+  document.getElementById('d-kills').textContent=D.kills;
+}
+
+/* ---------------- entering / leaving hell ---------------- */
+let mazeReturn=null;
+function reLock(){ try{ const p=canvas.requestPointerLock && canvas.requestPointerLock(); if(p && p.catch) p.catch(()=>{}); }catch(e){} }
+function allTerminalsShot(){ return COMPUTERS.every(t=>t.broken); }
+
+function enterHell(){
+  if(doomActive) return;
+  mazeReturn={ x:camera.position.x, z:camera.position.z, yaw:yaw, pitch:pitch };
+  doomActive=true; mode='doom'; D.dead=false;
+  doomEnterAt=performance.now();
+  resetHell();
+  doomScene.add(camera);                       // carry the viewmodel into hell
+  renderer.setClearColor(0x2a0a06);
+  gunOut=true; gunGroup.visible=true;
+  reloading=false; ammo=STATS.mag; ammoHud();      // you go in with a full cylinder
+  promptEl.style.opacity='0'; crossEl.style.opacity='1';
+  mapOpen=false; mapEl.classList.remove('on');
+  document.getElementById('keys').style.display='none';
+  document.getElementById('maphint').style.display='none';
+  dHudEl.classList.add('on'); dOverEl.classList.remove('on');
+  sfxPort(); flashScreen(1);
+  dBanner('THE CAKE WAS A LIE<br><span style="font-size:14px;letter-spacing:5px">KILL THEM ALL</span>', 3000);
+  if(!locked) reLock();
+}
+
+function leaveHell(cleared){
+  doomActive=false; mode='world'; D.dead=false;
+  clearMonsters();
+  scene.add(camera);
+  renderer.setClearColor(0x59636f);
+  camera.position.set(mazeReturn?mazeReturn.x:tileX(SPAWN_TILE[0]), EYE, mazeReturn?mazeReturn.z:tileZ(SPAWN_TILE[1]));
+  yaw = mazeReturn?mazeReturn.yaw:0; pitch = mazeReturn?mazeReturn.pitch:0;
+  pausedTotal += performance.now()-doomEnterAt;   // hell time doesn't count against the maze run
+  dHudEl.classList.remove('on'); dOverEl.classList.remove('on');
+  dBanEl.classList.remove('on'); dFlashEl.style.opacity='0';
+  document.getElementById('keys').style.display='';
+  document.getElementById('maphint').style.display='';
+  crossEl.style.opacity='1';
+  reloading=false; ammo=STATS.mag; ammoHud();
+  if(cleared){ doomCleared=true; }
+  reLock();
+}
+
+function resetHell(){
+  clearMonsters();
+  D.hp=100; D.kills=0; D.wave=0; D.gap=1.6; D.spawnT=0; D.cool=0; D.dead=false; D.waiting=true;
+  reloading=false; ammo=STATS.mag; ammoHud();
+  camera.position.set(0, EYE, ARENA-4); yaw=0; pitch=0;   // facing the altar at the centre
+  dHud();
+}
+function clearMonsters(){
+  monsters.forEach(m=>doomScene.remove(m.sprite));
+  fireballs.forEach(b=>doomScene.remove(b.sprite));
+  monsters.length=0; fireballs.length=0; spawnQueue.length=0;
+}
+
+/* ---------------- spawning ---------------- */
+function spawnAt(){
+  for(let tries=0;tries<40;tries++){
+    const x=(Math.random()*2-1)*(ARENA-3), z=(Math.random()*2-1)*(ARENA-3);
+    if(Math.hypot(x-camera.position.x, z-camera.position.z) < 12) continue;
+    if(dBlocked(x,z,1.2)) continue;
+    return [x,z];
+  }
+  return [ -ARENA+3, -ARENA+3 ];
+}
+function spawnMonster(kind){
+  const k=KIND[kind], [x,z]=spawnAt();
+  const mat=new THREEJS.SpriteMaterial({map:SPRITES[kind][0],transparent:true,depthWrite:false,fog:true});
+  const sp=new THREEJS.Sprite(mat);
+  sp.scale.set(k.w,k.h,1); sp.position.set(x,k.h/2,z); doomScene.add(sp);
+  const m={ kind,k,sprite:sp,x,z,hp:k.hp,frame:0,ft:Math.random(),atk:0.8+Math.random(),
+            dying:false,dieT:0,flash:0,r:k.w*0.36 };
+  sp.userData.monster=m;
+  monsters.push(m);
+  const fl=new THREEJS.PointLight(0xff4a20,1.4,7); fl.position.set(x,1.2,z); doomScene.add(fl);
+  setTimeout(()=>doomScene.remove(fl), 260);
+  sfxGrowl();
+}
+function startWave(){
+  D.wave++;
+  if(D.wave>WAVES.length){ hellCleared(); return; }
+  spawnQueue.push(...WAVES[D.wave-1]);
+  D.spawnT=0; D.waiting=false;
+  dBanner('WAVE '+D.wave+' / '+WAVES.length, 1800);
+  dHud();
+}
+
+/* ---------------- combat ---------------- */
+function dBlocked(x,z,pad){
+  const R=pad===undefined?0.42:pad;
+  if(Math.abs(x)>ARENA-R || Math.abs(z)>ARENA-R) return true;
+  for(const b of dColliders)
+    if(x>b.minX-R && x<b.maxX+R && z>b.minZ-R && z<b.maxZ+R) return true;
+  return false;
+}
+function flashScreen(a){
+  doomFlashActive=true;
+  clearTimeout(doomFlashTimer);
+  dFlashEl.style.opacity=String(a);
+  doomFlashTimer=setTimeout(()=>{
+    doomFlashActive=false;
+    if(!D.dead) dFlashEl.style.opacity='0';
+  }, 160);
+}
+function hurtPlayer(n){
+  if(D.dead || !doomActive) return;
+  D.hp-=n; sfxHurt();
+  flashScreen(Math.min(0.85, 0.25+n/45));
+  dHud();
+  if(D.hp<=0){ D.hp=0; playerDied(); }
+}
+function damageMonster(m,n){
+  m.hp-=n; m.flash=0.09;
+  if(m.hp<=0 && !m.dying){
+    m.dying=true; m.dieT=0; D.kills++; sfxGib();
+    m.sprite.material.map=SPRITES[m.kind][2]; m.sprite.material.needsUpdate=true;
+    dHud();
+  } else sfxHit();
+}
+function doomShoot(){
+  if(D.dead || D.cool>0) return;
+  if(!canFire()) return;
+  spendRound();
+  D.cool=0.26; gunRecoil=1; playShot();
+  muzzle.visible=true; setTimeout(()=>{ if(muzzle) muzzle.visible=false; }, 60);
+  const live=monsters.filter(m=>!m.dying).map(m=>m.sprite);
+  if(!live.length) return;
+  camera.updateMatrixWorld(); doomScene.updateMatrixWorld(true); // sprites must be where we last drew them
+  ray.setFromCamera({x:0,y:0}, camera);
+  const hit=ray.intersectObjects(live,false)[0];
+  if(hit && hit.distance<60) damageMonster(hit.object.userData.monster, STATS.dmg);
+}
+function spawnFireball(m){
+  const mat=new THREEJS.SpriteMaterial({map:ballTex,transparent:true,depthWrite:false,
+    blending:THREEJS.AdditiveBlending,fog:false});
+  const sp=new THREEJS.Sprite(mat); sp.scale.set(0.9,0.9,1);
+  const y=m.k.h*0.62;
+  sp.position.set(m.x,y,m.z); doomScene.add(sp);
+  const dx=camera.position.x-m.x, dy=(EYE-0.15)-y, dz=camera.position.z-m.z;
+  const len=Math.hypot(dx,dy,dz)||1, sp0=13;
+  fireballs.push({sprite:sp,vx:dx/len*sp0,vy:dy/len*sp0,vz:dz/len*sp0,life:3.2,dmg:m.k.dmg});
+  tone(600,200,0.22,'sawtooth',0.08);
+}
+
+/* ---------------- per-frame hell update ---------------- */
+function updateDoom(dt){
+  camera.rotation.y=yaw; camera.rotation.x=pitch;
+  const now=performance.now();
+  doomTorch.intensity = 0.85 + Math.sin(now*0.006)*0.18;
+  lavaPools.forEach((p,i)=> p.light.intensity = 1.0 + Math.sin(now*0.011+i)*0.35 );
+  if(D.cool>0) D.cool-=dt;
+  if(D.dead) return;
+
+  // --- player movement ---
+  const speed=(keys['ShiftLeft']?6.6:4.3)*STATS.speedMul*dt;
+  let f=0,s=0;
+  if(keys['KeyW'])f+=1; if(keys['KeyS'])f-=1;
+  if(keys['KeyD'])s+=1; if(keys['KeyA'])s-=1;
+  if(f||s){
+    const fx=-Math.sin(yaw),fz=-Math.cos(yaw), rx=Math.cos(yaw),rz=-Math.sin(yaw);
+    let dx=fx*f+rx*s, dz=fz*f+rz*s; const len=Math.hypot(dx,dz)||1;
+    dx=dx/len*speed; dz=dz/len*speed;
+    if(!dBlocked(camera.position.x+dx, camera.position.z)) camera.position.x+=dx;
+    if(!dBlocked(camera.position.x, camera.position.z+dz)) camera.position.z+=dz;
+  }
+  camera.position.y = EYE + Math.sin(now*0.012)*(f||s?0.045:0.012);
+
+  // --- lava burns ---
+  let lavaBurning=false;
+  for(const p of lavaPools){
+    if(Math.hypot(camera.position.x-p.x, camera.position.z-p.z) < p.r){
+      lavaBurning=true;
+      D.hp -= 11*dt; dFlashEl.style.opacity='0.35'; dHud();
+      if(D.hp<=0){ D.hp=0; playerDied(); return; }
+    }
+  }
+  if(!lavaBurning && !doomFlashActive) dFlashEl.style.opacity='0';
+
+  // --- staggered spawns ---
+  if(spawnQueue.length){
+    D.spawnT-=dt;
+    if(D.spawnT<=0){ spawnMonster(spawnQueue.shift()); D.spawnT=0.55; dHud(); }
+  }
+
+  // --- demons ---
+  for(let i=monsters.length-1;i>=0;i--){
+    const m=monsters[i];
+    if(m.dying){
+      m.dieT+=dt;
+      m.sprite.material.opacity=Math.max(0,1-m.dieT/1.1);
+      m.sprite.scale.set(m.k.w, Math.max(0.4, m.k.h*(1-m.dieT*0.8)), 1);
+      m.sprite.position.y=m.sprite.scale.y/2;
+      if(m.dieT>1.1){ doomScene.remove(m.sprite); monsters.splice(i,1); dHud(); }
+      continue;
+    }
+    if(m.flash>0){ m.flash-=dt; m.sprite.material.color.setHex(m.flash>0?0xff8080:0xffffff); }
+
+    const dx=camera.position.x-m.x, dz=camera.position.z-m.z;
+    const dist=Math.hypot(dx,dz)||1;
+
+    // walk cycle
+    m.ft+=dt*2.6;
+    const fr=(m.ft|0)%2;
+    if(fr!==m.frame){ m.frame=fr; m.sprite.material.map=SPRITES[m.kind][fr]; m.sprite.material.needsUpdate=true; }
+
+    if(dist > m.k.reach){
+      let step=m.k.speed*dt;
+      let nx=m.x+dx/dist*step, nz=m.z+dz/dist*step;
+      // crude separation so the horde doesn't stack into one sprite
+      for(const o of monsters){
+        if(o===m||o.dying) continue;
+        const ox=nx-o.x, oz=nz-o.z, od=Math.hypot(ox,oz);
+        if(od>0.001 && od < m.r+o.r){ nx+=ox/od*(m.r+o.r-od)*0.6; nz+=oz/od*(m.r+o.r-od)*0.6; }
+      }
+      if(!dBlocked(nx,m.z,m.r)) m.x=nx;
+      else if(!dBlocked(m.x,m.z+ (dz>0?step:-step), m.r)) m.z += dz>0?step:-step;
+      if(!dBlocked(m.x,nz,m.r)) m.z=nz;
+      m.sprite.position.set(m.x, m.k.h/2 + Math.abs(Math.sin(m.ft*3.1))*0.07, m.z);
+    }
+
+    m.atk-=dt;
+    if(m.atk<=0){
+      if(dist<=m.k.reach+0.6){ hurtPlayer(m.k.dmg); m.atk=m.k.atk; tone(120,50,0.2,'square',0.12); }
+      else if(m.k.ranged && dist<26 && Math.random()<0.55){ spawnFireball(m); m.atk=m.k.atk+0.9; }
+      else m.atk=0.35;
+      if(D.dead) return;
+    }
+  }
+
+  // --- fireballs ---
+  for(let i=fireballs.length-1;i>=0;i--){
+    const b=fireballs[i];
+    b.sprite.position.x+=b.vx*dt; b.sprite.position.y+=b.vy*dt; b.sprite.position.z+=b.vz*dt;
+    b.life-=dt;
+    const p=b.sprite.position;
+    const hitPlayer = Math.hypot(p.x-camera.position.x, p.y-camera.position.y, p.z-camera.position.z) < 0.85;
+    if(hitPlayer || b.life<=0 || p.y<0.15 || dBlocked(p.x,p.z,0.1)){
+      if(hitPlayer) hurtPlayer(b.dmg);
+      doomScene.remove(b.sprite); fireballs.splice(i,1);
+      if(D.dead) return;
+    }
+  }
+
+  // --- wave flow ---
+  if(!D.waiting && !spawnQueue.length && monsters.filter(m=>!m.dying).length===0){
+    D.waiting=true; D.gap=2.4;
+    if(D.wave>=WAVES.length){ hellCleared(); return; }
+    D.hp=Math.min(100, D.hp+25);
+    dBanner('WAVE CLEARED<br><span style="font-size:13px;letter-spacing:4px">+25 HEALTH</span>', 2000);
+    dHud();
+  } else if(D.waiting){
+    D.gap-=dt;
+    if(D.gap<=0) startWave();
+  }
+}
+
+/* ---------------- end states ---------------- */
+function playerDied(){
+  if(D.dead) return;
+  D.dead=true; mode='doomdead';
+  for(const k in keys) keys[k]=false;
+  clearTimeout(doomFlashTimer); doomFlashActive=false;
+  clearTimeout(banTimer); dBanEl.classList.remove('on');
+  dFlashEl.style.opacity='0.8';
+  tone(200,40,1.2,'sawtooth',0.2);
+  if(document.exitPointerLock) document.exitPointerLock();
+  crossEl.style.opacity='0';
+  document.getElementById('do-title').textContent='YOU DIED';
+  document.getElementById('do-sub').textContent='Wave '+D.wave+' of '+WAVES.length+' — the demons feast tonight.';
+  document.getElementById('do-kills').textContent=D.kills;
+  document.getElementById('do-retry').textContent='FIGHT AGAIN';
+  document.getElementById('do-leave').textContent='BACK TO THE MAZE';
+  dOverEl.classList.add('on');
+  dHud();
+}
+function hellCleared(){
+  if(D.dead) return;
+  D.dead=true; mode='doomdead'; doomCleared=true;
+  for(const k in keys) keys[k]=false;
+  clearTimeout(doomFlashTimer); doomFlashActive=false;
+  clearMonsters(); dHud();
+  if(document.exitPointerLock) document.exitPointerLock();
+  crossEl.style.opacity='0'; playDing();
+  document.getElementById('do-title').textContent='HELL CLEARED';
+  document.getElementById('do-sub').textContent='Every demon is meat. The cake is real again.';
+  document.getElementById('do-kills').textContent=D.kills;
+  document.getElementById('do-retry').textContent='FIGHT AGAIN';
+  document.getElementById('do-leave').textContent='RETURN TO THE CAKE';
+  dOverEl.classList.add('on');
+}
+document.getElementById('do-retry').addEventListener('click', ()=>{
+  dOverEl.classList.remove('on'); dFlashEl.style.opacity='0';
+  for(const k in keys) keys[k]=false;
+  mode='doom'; resetHell(); crossEl.style.opacity='1';
+  D.waiting=true; D.gap=1.2;
+  reLock();
+});
+document.getElementById('do-leave').addEventListener('click', ()=>{
+  const cleared=doomCleared;
+  leaveHell(cleared);
+  if(cleared) dBanner('', 1);
+});
+
 function loop(){
   requestAnimationFrame(loop);
   update(Math.min(clock.getDelta(), 0.05));
-  renderer.render(scene, camera);
+  renderer.render(doomActive ? doomScene : scene, camera);
 }
 loop();
 
@@ -867,7 +1699,9 @@ function loadBoard(b){
   if(currentComp.game==='pipes')     currentGame = Pipes(stageEl, b);
   if(currentComp.game==='memory')    currentGame = Memory(stageEl, b);
 }
-function markDone(key){
+function markDone(key, solved){
+  const t=COMPUTERS.find(c=>c.game===key);
+  if(t && solved) t.solved=true;
   const color = GAME_KEY[key];
   if(!color || keysHeld[color]) return;
   keysHeld[color]=true;
@@ -876,6 +1710,7 @@ function markDone(key){
   doors.forEach(d=>{ if(d.color===color && d.locked){ d.locked=false; d.opening=true; if(d.lockMat) d.lockMat.color.setHex(0x33dd66); } });
   if(mapOpen) drawMap();
   playDing();
+  if(solved) grantUpgrade();   // beating the puzzle buys the upgrade, busting the glass doesn't
 }
 
 /* ---- embedded real-word dictionary (Wordle validation) ---- */
@@ -939,7 +1774,7 @@ function Wordle(root, board){
     if(!WORDSET.has(cur.toLowerCase())){ flash('Not a valid word'); shake(); return; }
     guesses.push(cur);
     const win = cur===answer; cur=''; render();
-    if(win){ banner.textContent='ACCESS GRANTED \u2713'; banner.classList.add('win'); done=true; markDone('wordle'); again.style.display='block'; }
+    if(win){ banner.textContent='ACCESS GRANTED \u2713'; banner.classList.add('win'); done=true; markDone('wordle', true); again.style.display='block'; }
     else if(guesses.length>=ROWS){ banner.textContent='LOCKED OUT \u2014 word was '+answer; done=true; again.style.display='block'; }
   }
   function type(L){ if(done) return; if(cur.length<COLS){ cur+=L; render(); } }
@@ -1091,7 +1926,7 @@ function Crossword(root, board){
   function check(){
     for(let r=0;r<R;r++)for(let c=0;c<C;c++)
       if(sol[r][c]!=='#' && user[r][c]!==sol[r][c]) return;
-    done=true; banner.textContent='GRID COMPLETE ✓'; banner.classList.add('win'); markDone('crossword'); paint();
+    done=true; banner.textContent='GRID COMPLETE ✓'; banner.classList.add('win'); markDone('crossword', true); paint();
   }
   paint();
   return { key(e){
@@ -1165,7 +2000,7 @@ function Pipes(root, board){
       tiles[r][c].insertAdjacentHTML('beforeend', pipeSVG(dirsOf(grid[r][c].type,grid[r][c].rot), on));
     }
     if(solved && !banner.classList.contains('win')){
-      banner.textContent='CIRCUIT REROUTED ✓'; banner.classList.add('win'); markDone('pipes');
+      banner.textContent='CIRCUIT REROUTED ✓'; banner.classList.add('win'); markDone('pipes', true);
     } else if(!solved){
       banner.textContent='Rotate pipes to link IN ▸ OUT.'; banner.classList.remove('win');
     }
@@ -1230,7 +2065,7 @@ function Memory(root, board){
     }
   }
   function win(){
-    if(matched.size===deck.length){ done=true; banner.textContent='ALL MATCHED \u2713'; banner.classList.add('win'); markDone('memory'); }
+    if(matched.size===deck.length){ done=true; banner.textContent='ALL MATCHED \u2713'; banner.classList.add('win'); markDone('memory', true); }
   }
   return {};
 }
